@@ -26,6 +26,7 @@ https://github.com/NVlabs/sionna
 +-- docs/
 |   +-- channel-audit-findings.md
 |   +-- fec-audit-findings.md
+|   +-- forward-probe-findings.md
 |   +-- mapping-signal-audit-findings.md
 |   +-- mimo-audit-findings.md
 |   +-- nr-audit-findings.md
@@ -98,6 +99,9 @@ The current umbrella PHY CUDA summary is maintained in
 [docs/phy-audit-findings.md](docs/phy-audit-findings.md).
 Current OFDM CUDA findings are tracked in
 [docs/ofdm-audit-findings.md](docs/ofdm-audit-findings.md).
+Runtime-impact evidence from the current umbrella forward-probe sweep is
+summarized in
+[docs/forward-probe-findings.md](docs/forward-probe-findings.md).
 
 ## Quick start
 
@@ -134,15 +138,21 @@ python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-p
 Run focused category sweeps on the target CUDA device:
 
 ```bash
-python run_repro.py run --category channel --device cuda:1 --json-report reports/channel-cuda1.json
-python run_repro.py run --category mapping --device cuda:1 --json-report reports/mapping-cuda1.json
-python run_repro.py run --category signal --device cuda:1 --json-report reports/signal-cuda1.json
+python run_repro.py run --category channel --device cuda:1 --build-device cpu --no-fail --json-report reports/channel-cuda1.json
+python run_repro.py run --category mapping --device cuda:1 --build-device cpu --no-fail --json-report reports/mapping-cuda1.json
+python run_repro.py run --category signal --device cuda:1 --build-device cpu --no-fail --json-report reports/signal-cuda1.json
 ```
 
 Run only the post-`.to()` object-state audit for the current PHY case set:
 
 ```bash
 python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
+```
+
+Run the current PHY forward-probe sweep for cases with safe minimal inputs:
+
+```bash
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
 ```
 
 By default, repro objects are constructed on CPU before PyTorch `.to(device)` is
@@ -241,6 +251,9 @@ Collected audit-only CUDA evidence so far:
 - `sionna.phy.fec`: 30/31 current cases failed audit; standalone
   `fec-trellis` passed.
 - `sionna.phy.nr`: 12/12 current cases failed audit.
+- Latest collected umbrella PHY forward-probe sweep: 18 cases raised forward
+  exceptions, and 30 cases completed forward execution but returned 33 tensors
+  on CPU instead of `cuda:1`.
 
 The current case set covers:
 
@@ -303,19 +316,24 @@ expected:
 python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
 ```
 
-The next project step is to prepare an upstream-facing repro note and, if
-needed, add focused forward-probe reports for safe cases.
+The next project step is to prepare an upstream-facing repro note from the
+audit-only and forward-probe CUDA evidence.
 
 If multiple audit commands are chained in one shell command, pass `--no-fail`
 to earlier commands. Failed audit cases are expected and otherwise stop `&&`
 chains before later reports are collected.
 
-Then run focused forward probes:
+The current umbrella forward-probe sweep has also been collected:
 
 ```bash
-python run_repro.py run --category mapping --device cuda:1 --json-report reports/mapping-forward-cuda1.json
-python run_repro.py run --category signal --device cuda:1 --json-report reports/signal-forward-cuda1.json
-python run_repro.py run --category phy --device cuda:1 --json-report reports/phy-forward-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
+```
+
+Focused category forward probes can still be used when narrowing one area:
+
+```bash
+python run_repro.py run --category mapping --device cuda:1 --build-device cpu --no-fail --json-report reports/mapping-forward-cuda1.json
+python run_repro.py run --category signal --device cuda:1 --build-device cpu --no-fail --json-report reports/signal-forward-cuda1.json
 ```
 
 The key signal is not whether `cuda:1` differs from another GPU. The key signal

@@ -50,8 +50,10 @@ no skips. The clean FEC CUDA audit found 30 failed FEC-category cases, one
 passed standalone Trellis case, and no skips. The clean NR CUDA audit found 12
 failed NR-category cases and no skips. The latest collected umbrella PHY audit
 across the current 126-case dynamic set failed 125 cases, passed only
-`fec-trellis`, and had no skips. The next project target is an upstream-facing
-repro note, with forward-probe reports added only for safe cases.
+`fec-trellis`, and had no skips. The latest umbrella PHY forward-probe sweep
+found 18 forward exceptions and 30 cases with wrong-device forward outputs,
+covering 33 returned tensors. The next project target is an upstream-facing
+repro note from the audit-only and forward-probe CUDA evidence.
 
 ## Phase 3: upstream report material
 

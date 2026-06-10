@@ -49,6 +49,11 @@ Result:
 The category counts overlap by one case: `apply-ofdm` belongs to both
 `channel` and `ofdm`.
 
+The companion forward-probe sweep kept safe minimal forward inputs enabled for
+the same 126-case set. It found 18 forward exceptions and 30 cases that
+completed forward execution but returned 33 tensors on CPU instead of
+`cuda:1`. See [`forward-probe-findings.md`](forward-probe-findings.md).
+
 ## Area summary
 
 | Area | Failed cases | Main finding |
@@ -138,7 +143,8 @@ an isolated corner case.
 
 This document summarizes the latest collected 126-case umbrella PHY CUDA audit.
 Focused area reports are available for channel, mapping/signal, MIMO, OFDM,
-FEC, and NR.
+FEC, and NR. Runtime-impact evidence is summarized separately in
+[`forward-probe-findings.md`](forward-probe-findings.md).
 
 ```bash
 python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json

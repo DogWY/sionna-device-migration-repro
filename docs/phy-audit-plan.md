@@ -104,6 +104,12 @@ cases. The standalone `fec-trellis` case passed. See
 The clean standalone NR sweep found stale device state in all 12 NR-category
 cases. See [`docs/nr-audit-findings.md`](nr-audit-findings.md).
 
+The current umbrella PHY forward-probe sweep kept safe minimal inputs enabled
+for the same 126-case dynamic set. It found 18 forward exceptions and 30 cases
+that completed forward execution but returned 33 tensors on CPU instead of
+`cuda:1`. See
+[`docs/forward-probe-findings.md`](forward-probe-findings.md).
+
 ## Audit workflow
 
 ### Phase 1: inventory `sionna.phy`
@@ -171,7 +177,7 @@ python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-p
 Then run forward probes only for objects with small, reliable inputs:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --json-report reports/phy-forward-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
 ```
 
 Dynamic cases should:
@@ -233,7 +239,7 @@ Produce artifacts that can be shared with maintainers or collaborators:
 - [x] Run CPU smoke validation for standalone NR cases.
 - [x] Run audit-only NR sweep on the CUDA server.
 - [x] Rerun umbrella PHY sweep after the standalone NR expansion.
-- [ ] Run forward PHY sweep for safe cases.
+- [x] Run forward PHY sweep for safe cases.
 - [x] Summarize affected classes and failure modes for the current dynamic case
   set.
 - [ ] Prepare a short upstream-facing repro note.
@@ -283,6 +289,8 @@ Implemented already:
 - Clean CUDA audit-only evidence for standalone `nr` cases.
 - CUDA audit-only evidence for the current umbrella `phy` dynamic case set
   after standalone NR cases were added.
+- CUDA forward-probe evidence for the current 126-case umbrella `phy` dynamic
+  case set.
 
 Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
@@ -295,13 +303,12 @@ Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
 Not implemented yet:
 
-- forward-probe CUDA reports for safe cases.
+- upstream-facing repro note.
 
 ## Recommended next step
 
 Prepare a short upstream-facing repro note from the current 126-case CUDA
-evidence. If more runtime behavior evidence is needed first, run focused
-forward probes for safe cases:
+evidence. The latest forward-probe report can be regenerated with:
 
 ```bash
 python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
