@@ -16,14 +16,18 @@ def test_case_registry_contains_core_cases():
     assert "llrs2symbol-logits" in names
     assert "custom-window" in names
     assert "root-raised-cosine-filter" in names
+    assert "resource-grid-mapper" in names
+    assert "ls-channel-estimator" in names
+    assert "lmmse-equalizer" in names
 
 
-def test_case_registry_contains_phy_mapping_and_signal_categories():
+def test_case_registry_contains_phy_mapping_signal_and_ofdm_categories():
     cases = tuple(iter_cases())
 
     assert any("phy" in case.categories for case in cases)
     assert any("mapping" in case.categories for case in cases)
     assert any("signal" in case.categories for case in cases)
+    assert any("ofdm" in case.categories for case in cases)
 
 
 def test_get_case_rejects_unknown_name():

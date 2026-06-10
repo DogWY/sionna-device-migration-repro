@@ -25,6 +25,9 @@ https://github.com/NVlabs/sionna
 +-- run_repro.py
 +-- docs/
 |   +-- channel-audit-findings.md
+|   +-- mapping-signal-audit-findings.md
+|   +-- ofdm-audit-findings.md
+|   +-- phy-audit-findings.md
 |   +-- phy-audit-plan.md
 |   `-- project-plan.md
 +-- examples/
@@ -80,6 +83,12 @@ The detailed plan for auditing all relevant `sionna.phy` objects is maintained
 in [docs/phy-audit-plan.md](docs/phy-audit-plan.md).
 Current channel-specific CUDA findings are summarized in
 [docs/channel-audit-findings.md](docs/channel-audit-findings.md).
+Current mapping and signal CUDA findings are summarized in
+[docs/mapping-signal-audit-findings.md](docs/mapping-signal-audit-findings.md).
+The current umbrella PHY CUDA summary is maintained in
+[docs/phy-audit-findings.md](docs/phy-audit-findings.md).
+Current OFDM CUDA findings are tracked in
+[docs/ofdm-audit-findings.md](docs/ofdm-audit-findings.md).
 
 ## Quick start
 
@@ -211,6 +220,15 @@ The AWGN wrapper is only the first concrete failure. The more useful next step
 is to check whether the same stale-device pattern appears across other
 `sionna.phy` objects.
 
+Collected audit-only CUDA evidence so far:
+
+- Current umbrella PHY sweep after the standalone OFDM expansion: 75/75 cases
+  failed audit.
+- `sionna.phy.channel`: 17/17 current cases failed audit.
+- `sionna.phy.mapping`: 14/14 current cases failed audit.
+- `sionna.phy.signal`: 12/12 current cases failed audit.
+- Clean `sionna.phy.ofdm` sweep: 33/33 OFDM-category cases failed audit.
+
 The current case set covers:
 
 - Noise blocks: `AWGN`, wrapped `AWGNChannel`.
@@ -229,17 +247,30 @@ The current case set covers:
 - Signal blocks: `Upsampling`, `Downsampling`, window classes, and filter
   classes. Base `Window` and base `Filter` are audit-only cases because they
   do not have usable coefficients for a forward probe by themselves.
+- Standalone OFDM blocks: resource grids, pilot patterns, grid mappers and
+  demappers, OFDM modulation/demodulation, channel estimators, equalizers,
+  detector wrappers, detectors, and precoding helpers. Complex detector and
+  precoding cases are audit-only until safe forward probes are added.
 
-Use the same target CUDA device that exposed the original bug and run an
-audit-only sweep first:
+Use the same target CUDA device that exposed the original bug and run the
+current umbrella audit-only sweep:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --no-probe-forward --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/phy-audit-cuda1.json
 ```
 
 The command above constructs objects on CPU by default and then calls
-`.to(cuda:1)`. This keeps the audit focused on PyTorch migration behavior rather
-than on Sionna's global default device.
+`.to(cuda:1)`. The runner also temporarily aligns `sionna.phy.config.device`
+with `--build-device` during construction. This keeps the audit focused on
+PyTorch migration behavior rather than on Sionna's global default device.
+
+Use focused category sweeps when rechecking one area:
+
+```bash
+python run_repro.py run --category ofdm --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/ofdm-audit-cuda1.json
+```
+
+The next coverage expansion target is standalone `sionna.phy.mimo` cases.
 
 Then run focused forward probes:
 

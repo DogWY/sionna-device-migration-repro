@@ -78,6 +78,21 @@ A clean channel sweep with `--build-device cpu` found stale device state in all
 [`docs/channel-audit-findings.md`](channel-audit-findings.md) for the case-level
 summary.
 
+Clean mapping and signal sweeps with `--build-device cpu` found stale device
+state in all 26 implemented non-channel cases. See
+[`docs/mapping-signal-audit-findings.md`](mapping-signal-audit-findings.md) for
+the case-level summary.
+
+The first umbrella PHY sweep before standalone OFDM expansion found stale
+device state across all 43 dynamic cases. The current umbrella PHY sweep after
+standalone OFDM expansion found stale device state across all 75 dynamic cases.
+See [`docs/phy-audit-findings.md`](phy-audit-findings.md) for the current
+PHY-level summary.
+
+The clean standalone OFDM sweep found stale device state in all 33
+OFDM-category cases. See
+[`docs/ofdm-audit-findings.md`](ofdm-audit-findings.md).
+
 ## Audit workflow
 
 ### Phase 1: inventory `sionna.phy`
@@ -190,10 +205,16 @@ Produce artifacts that can be shared with maintainers or collaborators:
   `sionna.phy.mapping` and `sionna.phy.signal`.
 - [x] Keep `channel` cases as a subset category for focused reruns.
 - [x] Run audit-only channel sweep on the CUDA server.
-- [ ] Run audit-only PHY sweep on the CUDA server.
-- [ ] Run audit-only mapping and signal sweeps on the CUDA server.
+- [x] Run audit-only PHY sweep on the CUDA server.
+- [x] Run audit-only mapping and signal sweeps on the CUDA server.
+- [x] Add standalone `sionna.phy.ofdm` dynamic cases.
+- [x] Run first audit-only OFDM sweep on the CUDA server.
+- [x] Add construction-time Sionna `config.device` guard for `--build-device`.
+- [x] Rerun audit-only OFDM sweep after the construction-device fix.
+- [x] Run updated umbrella PHY sweep after the standalone OFDM expansion.
 - [ ] Run forward PHY sweep for safe cases.
-- [ ] Summarize affected classes and failure modes.
+- [x] Summarize affected classes and failure modes for the current dynamic case
+  set.
 - [ ] Prepare a short upstream-facing repro note.
 
 ## Current repository status
@@ -208,10 +229,20 @@ Implemented already:
 - `mapping` category with source, constellation, mapper, demapper, logits, and
   symbol-index conversion cases;
 - `signal` category with resampling, window, and filter cases;
+- `ofdm` category with resource-grid, pilot, mapper/demapper, modem, channel
+  estimator, equalizer, detector, and precoding cases;
 - `phy` umbrella category across the current dynamic case set;
 - primary user wrapper repro: `wrapped-awgn-channel`;
 - CPU smoke validation for the current channel, mapping, signal, and PHY case
   sets.
+- CPU smoke validation for the current OFDM case set.
+- CUDA audit-only evidence for `channel`, `mapping`, and `signal` dynamic
+  cases.
+- CUDA audit-only evidence for the first umbrella `phy` dynamic case set before
+  standalone OFDM cases were added.
+- Clean CUDA audit-only evidence for standalone `ofdm` cases.
+- CUDA audit-only evidence for the current umbrella `phy` dynamic case set
+  after standalone OFDM cases were added.
 
 Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
@@ -224,19 +255,16 @@ Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
 Not implemented yet:
 
-- dynamic repro cases for standalone `ofdm`, `mimo`, `fec`, and `nr` classes;
-- final PHY-wide CUDA audit reports.
+- dynamic repro cases for standalone `mimo`, `fec`, and `nr` classes;
+- forward-probe CUDA reports for safe cases.
 
 ## Recommended next step
 
-Run the new `mapping`, `signal`, and umbrella `phy` dynamic cases in the Ubuntu
-CUDA environment:
+Add standalone `sionna.phy.mimo` dynamic cases, then run:
 
 ```bash
-python run_repro.py run --category mapping --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mapping-audit-cuda1.json
-python run_repro.py run --category signal --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/signal-audit-cuda1.json
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category mimo --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mimo-audit-cuda1.json
 ```
 
-After those reports are collected, prioritize standalone `sionna.phy.ofdm`
-dynamic cases next.
+After the MIMO report is collected, decide whether to add `fec` or `nr` cases
+next.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -60,7 +62,8 @@ def run_case(
 ) -> CaseResult:
     build_device_label = "default" if build_device is None else build_device
     try:
-        obj = case.build(build_device)
+        with _sionna_build_device(build_device):
+            obj = case.build(build_device)
     except Exception as exc:
         return CaseResult(
             name=case.name,
@@ -121,3 +124,25 @@ def run_case(
         forward_issues=forward_issues,
         forward_error=forward_error,
     )
+
+
+@contextmanager
+def _sionna_build_device(build_device: str | None) -> Iterator[None]:
+    """Temporarily align Sionna's global construction device with a case build."""
+
+    if build_device is None:
+        yield
+        return
+
+    try:
+        from sionna.phy import config
+    except ModuleNotFoundError:
+        yield
+        return
+
+    previous_device = str(config.device)
+    config.device = build_device
+    try:
+        yield
+    finally:
+        config.device = previous_device

@@ -519,6 +519,429 @@ def _inputs_filter(device: str):
     return (x,), {"padding": "same"}
 
 
+def _stream_management_1x1():
+    import numpy as np
+    from sionna.phy.mimo import StreamManagement
+
+    return StreamManagement(np.array([[1]], dtype=np.int32), 1)
+
+
+def _resource_grid_empty(build_device: str | None):
+    from sionna.phy.ofdm import ResourceGrid
+
+    return ResourceGrid(
+        num_ofdm_symbols=4,
+        fft_size=8,
+        subcarrier_spacing=15e3,
+        num_tx=1,
+        num_streams_per_tx=1,
+        cyclic_prefix_length=2,
+        num_guard_carriers=(1, 1),
+        dc_null=True,
+        pilot_pattern="empty",
+        **_device_kwargs(build_device),
+    )
+
+
+def _resource_grid_kronecker(build_device: str | None):
+    from sionna.phy.ofdm import ResourceGrid
+
+    return ResourceGrid(
+        num_ofdm_symbols=4,
+        fft_size=8,
+        subcarrier_spacing=15e3,
+        num_tx=1,
+        num_streams_per_tx=1,
+        cyclic_prefix_length=2,
+        num_guard_carriers=(1, 1),
+        dc_null=True,
+        pilot_pattern="kronecker",
+        pilot_ofdm_symbol_indices=[1],
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_resource_grid_empty(build_device: str | None):
+    return _resource_grid_empty(build_device)
+
+
+def _build_resource_grid_kronecker(build_device: str | None):
+    return _resource_grid_kronecker(build_device)
+
+
+def _build_empty_pilot_pattern(build_device: str | None):
+    from sionna.phy.ofdm import EmptyPilotPattern
+
+    return EmptyPilotPattern(1, 1, 4, 5, **_device_kwargs(build_device))
+
+
+def _build_pilot_pattern(build_device: str | None):
+    import torch
+    from sionna.phy.ofdm import PilotPattern
+
+    tensor_kwargs = _device_kwargs(build_device)
+    mask = torch.zeros((1, 1, 4, 5), dtype=torch.bool, **tensor_kwargs)
+    pilots = torch.zeros((1, 1, 0), dtype=torch.complex64, **tensor_kwargs)
+    return PilotPattern(mask, pilots, **_device_kwargs(build_device))
+
+
+def _build_kronecker_pilot_pattern(build_device: str | None):
+    from sionna.phy.ofdm import KroneckerPilotPattern
+
+    return KroneckerPilotPattern(
+        _resource_grid_empty(build_device),
+        [1],
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_resource_grid_mapper(build_device: str | None):
+    from sionna.phy.ofdm import ResourceGridMapper
+
+    return ResourceGridMapper(_resource_grid_empty(build_device), **_device_kwargs(build_device))
+
+
+def _inputs_resource_grid_mapper(device: str):
+    torch = _torch()
+    x = torch.ones((2, 1, 1, 20), dtype=torch.complex64, device=device)
+    return (x,), {}
+
+
+def _build_resource_grid_demapper(build_device: str | None):
+    from sionna.phy.ofdm import ResourceGridDemapper
+
+    return ResourceGridDemapper(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _inputs_resource_grid_demapper(device: str):
+    torch = _torch()
+    y = torch.ones((2, 1, 1, 4, 8), dtype=torch.complex64, device=device)
+    return (y,), {}
+
+
+def _build_remove_nulled_subcarriers(build_device: str | None):
+    from sionna.phy.ofdm import RemoveNulledSubcarriers
+
+    return RemoveNulledSubcarriers(_resource_grid_empty(build_device), **_device_kwargs(build_device))
+
+
+def _inputs_remove_nulled_subcarriers(device: str):
+    torch = _torch()
+    y = torch.ones((2, 1, 1, 4, 8), dtype=torch.complex64, device=device)
+    return (y,), {}
+
+
+def _build_ofdm_modulator(build_device: str | None):
+    from sionna.phy.ofdm import OFDMModulator
+
+    return OFDMModulator(cyclic_prefix_length=2, **_device_kwargs(build_device))
+
+
+def _inputs_ofdm_modulator(device: str):
+    torch = _torch()
+    x = torch.ones((2, 4, 8), dtype=torch.complex64, device=device)
+    return (x,), {}
+
+
+def _build_ofdm_demodulator(build_device: str | None):
+    from sionna.phy.ofdm import OFDMDemodulator
+
+    return OFDMDemodulator(
+        fft_size=8,
+        l_min=0,
+        cyclic_prefix_length=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _inputs_ofdm_demodulator(device: str):
+    torch = _torch()
+    x = torch.ones((2, 40), dtype=torch.complex64, device=device)
+    return (x,), {}
+
+
+def _build_base_channel_interpolator(build_device: str | None):
+    from sionna.phy.ofdm import BaseChannelInterpolator
+
+    return BaseChannelInterpolator(**_device_kwargs(build_device))
+
+
+def _build_base_channel_estimator(build_device: str | None):
+    from sionna.phy.ofdm import BaseChannelEstimator
+
+    return BaseChannelEstimator(
+        _resource_grid_kronecker(build_device),
+        interpolation_type=None,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_ls_channel_estimator(build_device: str | None):
+    from sionna.phy.ofdm import LSChannelEstimator
+
+    return LSChannelEstimator(
+        _resource_grid_kronecker(build_device),
+        interpolation_type=None,
+        **_device_kwargs(build_device),
+    )
+
+
+def _inputs_ls_channel_estimator(device: str):
+    torch = _torch()
+    y = torch.ones((2, 1, 1, 4, 8), dtype=torch.complex64, device=device)
+    no = torch.tensor(0.1, dtype=torch.float32, device=device)
+    return (y, no), {}
+
+
+def _build_lmmse_equalizer(build_device: str | None):
+    from sionna.phy.ofdm import LMMSEEqualizer
+
+    return LMMSEEqualizer(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_zf_equalizer(build_device: str | None):
+    from sionna.phy.ofdm import ZFEqualizer
+
+    return ZFEqualizer(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_mf_equalizer(build_device: str | None):
+    from sionna.phy.ofdm import MFEqualizer
+
+    return MFEqualizer(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _inputs_ofdm_equalizer(device: str):
+    torch = _torch()
+    y = torch.ones((2, 1, 1, 4, 8), dtype=torch.complex64, device=device)
+    h_hat = torch.ones((2, 1, 1, 1, 1, 4, 5), dtype=torch.complex64, device=device)
+    err_var = torch.zeros((2, 1, 1, 1, 1, 4, 5), dtype=torch.float32, device=device)
+    no = torch.tensor(0.1, dtype=torch.float32, device=device)
+    return (y, h_hat, err_var, no), {}
+
+
+def _build_lmmse_post_equalization_sinr(build_device: str | None):
+    from sionna.phy.ofdm import LMMSEPostEqualizationSINR
+
+    return LMMSEPostEqualizationSINR(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_post_equalization_sinr(build_device: str | None):
+    from sionna.phy.ofdm import PostEqualizationSINR
+
+    return PostEqualizationSINR(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _dummy_equalizer(y, h_hat, err_var, no):
+    _ = h_hat, err_var, no
+    return y, y.real
+
+
+def _dummy_detector(y, h_hat, err_var, no):
+    _ = h_hat, err_var, no
+    return y.real
+
+
+def _dummy_detector_with_prior(y, h_hat, prior, err_var, no):
+    _ = h_hat, prior, err_var, no
+    return y.real
+
+
+def _build_ofdm_equalizer(build_device: str | None):
+    from sionna.phy.ofdm import OFDMEqualizer
+
+    return OFDMEqualizer(
+        _dummy_equalizer,
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_linear_detector(build_device: str | None):
+    from sionna.phy.ofdm import LinearDetector
+
+    return LinearDetector(
+        "lmmse",
+        "bit",
+        "app",
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_maximum_likelihood_detector(build_device: str | None):
+    from sionna.phy.ofdm import MaximumLikelihoodDetector
+
+    return MaximumLikelihoodDetector(
+        "bit",
+        "app",
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_maximum_likelihood_detector_with_prior(build_device: str | None):
+    from sionna.phy.ofdm import MaximumLikelihoodDetectorWithPrior
+
+    return MaximumLikelihoodDetectorWithPrior(
+        "bit",
+        "app",
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_k_best_detector(build_device: str | None):
+    from sionna.phy.ofdm import KBestDetector
+
+    return KBestDetector(
+        "bit",
+        1,
+        4,
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_ep_detector(build_device: str | None):
+    from sionna.phy.ofdm import EPDetector
+
+    return EPDetector(
+        "bit",
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_mmse_pic_detector(build_device: str | None):
+    from sionna.phy.ofdm import MMSEPICDetector
+
+    return MMSEPICDetector(
+        "bit",
+        "app",
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_ofdm_detector(build_device: str | None):
+    from sionna.phy.ofdm import OFDMDetector
+
+    return OFDMDetector(
+        _dummy_detector,
+        "bit",
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_ofdm_detector_with_prior(build_device: str | None):
+    from sionna.phy.ofdm import OFDMDetectorWithPrior
+
+    return OFDMDetectorWithPrior(
+        _dummy_detector_with_prior,
+        "bit",
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_rzf_precoder(build_device: str | None):
+    from sionna.phy.ofdm import RZFPrecoder
+
+    return RZFPrecoder(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_precoded_channel(build_device: str | None):
+    from sionna.phy.ofdm import PrecodedChannel
+
+    return PrecodedChannel(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_cbf_precoded_channel(build_device: str | None):
+    from sionna.phy.ofdm import CBFPrecodedChannel
+
+    return CBFPrecodedChannel(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_eye_precoded_channel(build_device: str | None):
+    from sionna.phy.ofdm import EyePrecodedChannel
+
+    return EyePrecodedChannel(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_rzf_precoded_channel(build_device: str | None):
+    from sionna.phy.ofdm import RZFPrecodedChannel
+
+    return RZFPrecodedChannel(
+        _resource_grid_empty(build_device),
+        _stream_management_1x1(),
+        **_device_kwargs(build_device),
+    )
+
+
 _CASES = (
     CaseSpec(
         name="awgn",
@@ -823,5 +1246,235 @@ _CASES = (
         build=_build_root_raised_cosine_filter,
         make_inputs=_inputs_filter,
         categories=_categories("signal", "filter"),
+    ),
+    CaseSpec(
+        name="resource-grid-empty",
+        description="ResourceGrid with an empty pilot pattern; central OFDM grid metadata object.",
+        build=_build_resource_grid_empty,
+        make_inputs=None,
+        categories=_categories("ofdm", "resource-grid", "audit-only"),
+    ),
+    CaseSpec(
+        name="resource-grid-kronecker",
+        description="ResourceGrid with a Kronecker pilot pattern; owns nested pilot pattern state.",
+        build=_build_resource_grid_kronecker,
+        make_inputs=None,
+        categories=_categories("ofdm", "resource-grid", "pilot"),
+    ),
+    CaseSpec(
+        name="empty-pilot-pattern",
+        description="EmptyPilotPattern; OFDM pilot metadata without pilot tensors.",
+        build=_build_empty_pilot_pattern,
+        make_inputs=None,
+        categories=_categories("ofdm", "pilot", "audit-only"),
+    ),
+    CaseSpec(
+        name="pilot-pattern",
+        description="PilotPattern; explicit pilot mask and pilot tensors.",
+        build=_build_pilot_pattern,
+        make_inputs=None,
+        categories=_categories("ofdm", "pilot", "audit-only"),
+    ),
+    CaseSpec(
+        name="kronecker-pilot-pattern",
+        description="KroneckerPilotPattern; generated pilot tensors tied to a ResourceGrid.",
+        build=_build_kronecker_pilot_pattern,
+        make_inputs=None,
+        categories=_categories("ofdm", "pilot", "audit-only"),
+    ),
+    CaseSpec(
+        name="resource-grid-mapper",
+        description="ResourceGridMapper; maps stream symbols into an OFDM resource grid.",
+        build=_build_resource_grid_mapper,
+        make_inputs=_inputs_resource_grid_mapper,
+        categories=_categories("ofdm", "resource-grid", "mapper"),
+    ),
+    CaseSpec(
+        name="resource-grid-demapper",
+        description="ResourceGridDemapper; extracts stream symbols from an OFDM resource grid.",
+        build=_build_resource_grid_demapper,
+        make_inputs=_inputs_resource_grid_demapper,
+        categories=_categories("ofdm", "resource-grid", "demapper"),
+    ),
+    CaseSpec(
+        name="remove-nulled-subcarriers",
+        description="RemoveNulledSubcarriers; removes guard and DC subcarriers from an OFDM grid.",
+        build=_build_remove_nulled_subcarriers,
+        make_inputs=_inputs_remove_nulled_subcarriers,
+        categories=_categories("ofdm", "resource-grid"),
+    ),
+    CaseSpec(
+        name="ofdm-modulator",
+        description="OFDMModulator; converts frequency-domain OFDM symbols to time-domain samples.",
+        build=_build_ofdm_modulator,
+        make_inputs=_inputs_ofdm_modulator,
+        categories=_categories("ofdm", "modem"),
+    ),
+    CaseSpec(
+        name="ofdm-demodulator",
+        description="OFDMDemodulator; converts time-domain OFDM samples to frequency-domain symbols.",
+        build=_build_ofdm_demodulator,
+        make_inputs=_inputs_ofdm_demodulator,
+        categories=_categories("ofdm", "modem"),
+    ),
+    CaseSpec(
+        name="base-channel-interpolator",
+        description="BaseChannelInterpolator; audit-only base OFDM channel interpolation object.",
+        build=_build_base_channel_interpolator,
+        make_inputs=None,
+        categories=_categories("ofdm", "channel-estimation", "audit-only"),
+    ),
+    CaseSpec(
+        name="base-channel-estimator",
+        description=(
+            "BaseChannelEstimator without default interpolator; audit-only base "
+            "OFDM channel estimator object."
+        ),
+        build=_build_base_channel_estimator,
+        make_inputs=None,
+        categories=_categories("ofdm", "channel-estimation", "audit-only"),
+    ),
+    CaseSpec(
+        name="ls-channel-estimator",
+        description=(
+            "LSChannelEstimator without default interpolator; pilot-only least-squares "
+            "channel estimator."
+        ),
+        build=_build_ls_channel_estimator,
+        make_inputs=_inputs_ls_channel_estimator,
+        categories=_categories("ofdm", "channel-estimation"),
+    ),
+    CaseSpec(
+        name="lmmse-equalizer",
+        description="LMMSEEqualizer; OFDM linear MMSE equalizer with resource-grid metadata.",
+        build=_build_lmmse_equalizer,
+        make_inputs=_inputs_ofdm_equalizer,
+        categories=_categories("ofdm", "equalizer"),
+    ),
+    CaseSpec(
+        name="zf-equalizer",
+        description="ZFEqualizer; OFDM zero-forcing equalizer with resource-grid metadata.",
+        build=_build_zf_equalizer,
+        make_inputs=_inputs_ofdm_equalizer,
+        categories=_categories("ofdm", "equalizer"),
+    ),
+    CaseSpec(
+        name="mf-equalizer",
+        description="MFEqualizer; OFDM matched-filter equalizer with resource-grid metadata.",
+        build=_build_mf_equalizer,
+        make_inputs=_inputs_ofdm_equalizer,
+        categories=_categories("ofdm", "equalizer"),
+    ),
+    CaseSpec(
+        name="lmmse-post-equalization-sinr",
+        description="LMMSEPostEqualizationSINR; audit-only post-equalization SINR helper.",
+        build=_build_lmmse_post_equalization_sinr,
+        make_inputs=None,
+        categories=_categories("ofdm", "equalizer", "audit-only"),
+    ),
+    CaseSpec(
+        name="post-equalization-sinr",
+        description="PostEqualizationSINR; audit-only post-equalization SINR helper.",
+        build=_build_post_equalization_sinr,
+        make_inputs=None,
+        categories=_categories("ofdm", "equalizer", "audit-only"),
+    ),
+    CaseSpec(
+        name="ofdm-equalizer",
+        description="OFDMEqualizer; audit-only wrapper around a user-provided equalizer callable.",
+        build=_build_ofdm_equalizer,
+        make_inputs=None,
+        categories=_categories("ofdm", "equalizer", "audit-only"),
+    ),
+    CaseSpec(
+        name="linear-detector",
+        description="LinearDetector; OFDM linear detector with constellation metadata.",
+        build=_build_linear_detector,
+        make_inputs=None,
+        categories=_categories("ofdm", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="maximum-likelihood-detector",
+        description="MaximumLikelihoodDetector; OFDM ML detector with constellation metadata.",
+        build=_build_maximum_likelihood_detector,
+        make_inputs=None,
+        categories=_categories("ofdm", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="maximum-likelihood-detector-with-prior",
+        description="MaximumLikelihoodDetectorWithPrior; OFDM ML detector with prior metadata.",
+        build=_build_maximum_likelihood_detector_with_prior,
+        make_inputs=None,
+        categories=_categories("ofdm", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="k-best-detector",
+        description="KBestDetector; OFDM K-best detector with constellation metadata.",
+        build=_build_k_best_detector,
+        make_inputs=None,
+        categories=_categories("ofdm", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="ep-detector",
+        description="EPDetector; OFDM expectation-propagation detector.",
+        build=_build_ep_detector,
+        make_inputs=None,
+        categories=_categories("ofdm", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="mmse-pic-detector",
+        description="MMSEPICDetector; OFDM MMSE-PIC detector with constellation metadata.",
+        build=_build_mmse_pic_detector,
+        make_inputs=None,
+        categories=_categories("ofdm", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="ofdm-detector",
+        description="OFDMDetector; audit-only wrapper around a user-provided detector callable.",
+        build=_build_ofdm_detector,
+        make_inputs=None,
+        categories=_categories("ofdm", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="ofdm-detector-with-prior",
+        description="OFDMDetectorWithPrior; audit-only detector wrapper with prior metadata.",
+        build=_build_ofdm_detector_with_prior,
+        make_inputs=None,
+        categories=_categories("ofdm", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="rzf-precoder",
+        description="RZFPrecoder; audit-only OFDM regularized zero-forcing precoder.",
+        build=_build_rzf_precoder,
+        make_inputs=None,
+        categories=_categories("ofdm", "precoding", "audit-only"),
+    ),
+    CaseSpec(
+        name="precoded-channel",
+        description="PrecodedChannel; audit-only base precoded OFDM channel helper.",
+        build=_build_precoded_channel,
+        make_inputs=None,
+        categories=_categories("ofdm", "precoding", "audit-only"),
+    ),
+    CaseSpec(
+        name="cbf-precoded-channel",
+        description="CBFPrecodedChannel; audit-only conjugate beamforming channel helper.",
+        build=_build_cbf_precoded_channel,
+        make_inputs=None,
+        categories=_categories("ofdm", "precoding", "audit-only"),
+    ),
+    CaseSpec(
+        name="eye-precoded-channel",
+        description="EyePrecodedChannel; audit-only identity precoding channel helper.",
+        build=_build_eye_precoded_channel,
+        make_inputs=None,
+        categories=_categories("ofdm", "precoding", "audit-only"),
+    ),
+    CaseSpec(
+        name="rzf-precoded-channel",
+        description="RZFPrecodedChannel; audit-only RZF-precoded OFDM channel helper.",
+        build=_build_rzf_precoded_channel,
+        make_inputs=None,
+        categories=_categories("ofdm", "precoding", "audit-only"),
     ),
 )

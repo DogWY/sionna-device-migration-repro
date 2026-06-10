@@ -3,8 +3,8 @@
 ## Goal
 
 Build a narrow, reproducible, and extensible project that demonstrates how
-Sionna PHY channel objects, despite being `torch.nn.Module` instances, may fail
-to migrate all internal state when `.to("cuda:0")` is called directly.
+Sionna PHY objects, despite being `torch.nn.Module` instances, may fail to
+migrate all internal state when `.to("cuda:0")` is called directly.
 
 ## Scope boundaries
 
@@ -32,9 +32,20 @@ Prioritize these object categories:
 - Composite objects with child blocks, such as `FlatFadingChannel`.
 - Objects with registered buffers, such as `KroneckerModel` and
   `PerColumnModel`.
+- Mapping objects with lookup tensors, constellations, and child source or
+  mapper blocks.
+- Signal objects with generated or user-provided coefficient tensors.
 - Objects that generate or apply OFDM and time-domain channel behavior.
 - TR 38.901 objects, especially those with internal caches, topology state,
   random state, or many tensor attributes.
+
+Current dynamic coverage includes `sionna.phy.channel`,
+`sionna.phy.mapping`, `sionna.phy.signal`, and standalone `sionna.phy.ofdm`
+cases. The first 43 audit-only CUDA cases covering channel, mapping, and signal
+all failed after CPU construction followed by `.to(cuda:1)`. The clean OFDM
+CUDA audit found 33 failed OFDM-category cases and no skips. The updated
+umbrella PHY audit across the current 75-case dynamic set also failed 75/75
+cases with no skips. The next coverage target is standalone `sionna.phy.mimo`.
 
 ## Phase 3: upstream report material
 

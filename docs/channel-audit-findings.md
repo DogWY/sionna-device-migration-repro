@@ -131,11 +131,18 @@ Dynamic repro coverage has now been extended beyond `sionna.phy.channel` for:
 - `sionna.phy.mapping`
 - `sionna.phy.signal`
 
-The next CUDA-server step is to collect audit-only reports for those categories:
+The mapping and signal CUDA reports have also been collected. See
+[`mapping-signal-audit-findings.md`](mapping-signal-audit-findings.md).
+
+The umbrella PHY report has now also been collected. See
+[`phy-audit-findings.md`](phy-audit-findings.md).
+
+Standalone `sionna.phy.ofdm` dynamic cases have now been added and audited. The
+clean OFDM sweep found 33/33 OFDM-category cases failed and 0 skipped. The
+updated umbrella PHY sweep also found 75/75 current cases failed and 0 skipped.
+The next step is to add standalone `sionna.phy.mimo` cases. After those cases
+are implemented, run:
 
 ```bash
-python run_repro.py run --category mapping --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mapping-audit-cuda1.json
-python run_repro.py run --category signal --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/signal-audit-cuda1.json
+python run_repro.py run --category mimo --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mimo-audit-cuda1.json
 ```
-
-After that, extend dynamic coverage to standalone `sionna.phy.ofdm` classes.
