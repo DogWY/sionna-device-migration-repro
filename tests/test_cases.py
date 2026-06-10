@@ -21,14 +21,18 @@ def test_case_registry_contains_core_cases():
     assert "lmmse-equalizer" in names
     assert "mimo-list2llr-simple" in names
     assert "mimo-k-best-detector" in names
+    assert "fec-crc-encoder" in names
+    assert "fec-ldpc-5g-encoder" in names
+    assert "fec-polar-5g-decoder" in names
 
 
-def test_case_registry_contains_phy_mapping_signal_mimo_and_ofdm_categories():
+def test_case_registry_contains_phy_mapping_signal_fec_mimo_and_ofdm_categories():
     cases = tuple(iter_cases())
 
     assert any("phy" in case.categories for case in cases)
     assert any("mapping" in case.categories for case in cases)
     assert any("signal" in case.categories for case in cases)
+    assert any("fec" in case.categories for case in cases)
     assert any("mimo" in case.categories for case in cases)
     assert any("ofdm" in case.categories for case in cases)
 

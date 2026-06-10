@@ -519,6 +519,250 @@ def _inputs_filter(device: str):
     return (x,), {"padding": "same"}
 
 
+def _fec_linear_generator_matrix():
+    import numpy as np
+
+    return np.array([[1, 0, 1], [0, 1, 1]], dtype=np.int32)
+
+
+def _fec_ldpc_pcm():
+    import numpy as np
+
+    return np.array([[1, 1, 0, 1], [0, 1, 1, 1]], dtype=np.int32)
+
+
+def _fec_polar_frozen_positions():
+    import numpy as np
+
+    return np.array([0, 1], dtype=int)
+
+
+def _build_fec_gaussian_prior_source(build_device: str | None):
+    from sionna.phy.fec import GaussianPriorSource
+
+    return GaussianPriorSource(**_device_kwargs(build_device))
+
+
+def _build_fec_crc_encoder(build_device: str | None):
+    from sionna.phy.fec import CRCEncoder
+
+    return CRCEncoder("CRC6", k=8, **_device_kwargs(build_device))
+
+
+def _build_fec_crc_decoder(build_device: str | None):
+    from sionna.phy.fec import CRCDecoder
+
+    return CRCDecoder(_build_fec_crc_encoder(build_device), **_device_kwargs(build_device))
+
+
+def _build_fec_trellis(build_device: str | None):
+    from sionna.phy.fec.conv.utils import Trellis
+
+    return Trellis(("101", "111"), **_device_kwargs(build_device))
+
+
+def _build_fec_conv_encoder(build_device: str | None):
+    from sionna.phy.fec import ConvEncoder
+
+    return ConvEncoder(**_device_kwargs(build_device))
+
+
+def _build_fec_viterbi_decoder(build_device: str | None):
+    from sionna.phy.fec import ViterbiDecoder
+
+    return ViterbiDecoder(**_device_kwargs(build_device))
+
+
+def _build_fec_bcjr_decoder(build_device: str | None):
+    from sionna.phy.fec import BCJRDecoder
+
+    return BCJRDecoder(**_device_kwargs(build_device))
+
+
+def _build_fec_row_column_interleaver(build_device: str | None):
+    from sionna.phy.fec import RowColumnInterleaver
+
+    return RowColumnInterleaver(4, **_device_kwargs(build_device))
+
+
+def _build_fec_random_interleaver(build_device: str | None):
+    from sionna.phy.fec import RandomInterleaver
+
+    return RandomInterleaver(seed=1, **_device_kwargs(build_device))
+
+
+def _build_fec_turbo_3gpp_interleaver(build_device: str | None):
+    from sionna.phy.fec import Turbo3GPPInterleaver
+
+    return Turbo3GPPInterleaver(**_device_kwargs(build_device))
+
+
+def _build_fec_deinterleaver(build_device: str | None):
+    from sionna.phy.fec import Deinterleaver
+
+    return Deinterleaver(
+        _build_fec_random_interleaver(build_device),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_scrambler(build_device: str | None):
+    from sionna.phy.fec import Scrambler
+
+    return Scrambler(seed=1, keep_batch_constant=True, **_device_kwargs(build_device))
+
+
+def _build_fec_tb5g_scrambler(build_device: str | None):
+    from sionna.phy.fec import TB5GScrambler
+
+    return TB5GScrambler(**_device_kwargs(build_device))
+
+
+def _build_fec_descrambler(build_device: str | None):
+    from sionna.phy.fec import Descrambler
+
+    return Descrambler(_build_fec_scrambler(build_device), **_device_kwargs(build_device))
+
+
+def _build_fec_linear_encoder(build_device: str | None):
+    from sionna.phy.fec import LinearEncoder
+
+    return LinearEncoder(_fec_linear_generator_matrix(), **_device_kwargs(build_device))
+
+
+def _build_fec_os_decoder(build_device: str | None):
+    from sionna.phy.fec import OSDecoder
+
+    return OSDecoder(
+        enc_mat=_fec_linear_generator_matrix(),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_ldpc_bp_decoder(build_device: str | None):
+    from sionna.phy.fec import LDPCBPDecoder
+
+    return LDPCBPDecoder(
+        _fec_ldpc_pcm(),
+        num_iter=1,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_ldpc_5g_encoder(build_device: str | None):
+    from sionna.phy.fec import LDPC5GEncoder
+
+    return LDPC5GEncoder(12, 24, **_device_kwargs(build_device))
+
+
+def _build_fec_ldpc_5g_decoder(build_device: str | None):
+    from sionna.phy.fec import LDPC5GDecoder
+
+    return LDPC5GDecoder(
+        _build_fec_ldpc_5g_encoder(build_device),
+        num_iter=1,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_exit_callback(build_device: str | None):
+    from sionna.phy.fec.ldpc.utils import EXITCallback
+
+    return EXITCallback(1, **_device_kwargs(build_device))
+
+
+def _build_fec_decoder_statistics_callback(build_device: str | None):
+    from sionna.phy.fec.ldpc.utils import DecoderStatisticsCallback
+
+    return DecoderStatisticsCallback(1, **_device_kwargs(build_device))
+
+
+def _build_fec_weighted_bp_callback(build_device: str | None):
+    from sionna.phy.fec.ldpc.utils import WeightedBPCallback
+
+    return WeightedBPCallback(4, **_device_kwargs(build_device))
+
+
+def _build_fec_polar_encoder(build_device: str | None):
+    from sionna.phy.fec import PolarEncoder
+
+    return PolarEncoder(
+        _fec_polar_frozen_positions(),
+        4,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_polar_sc_decoder(build_device: str | None):
+    from sionna.phy.fec import PolarSCDecoder
+
+    return PolarSCDecoder(
+        _fec_polar_frozen_positions(),
+        4,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_polar_scl_decoder(build_device: str | None):
+    from sionna.phy.fec import PolarSCLDecoder
+
+    return PolarSCLDecoder(
+        _fec_polar_frozen_positions(),
+        4,
+        list_size=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_polar_bp_decoder(build_device: str | None):
+    from sionna.phy.fec import PolarBPDecoder
+
+    return PolarBPDecoder(
+        _fec_polar_frozen_positions(),
+        4,
+        num_iter=1,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_polar_5g_encoder(build_device: str | None):
+    from sionna.phy.fec import Polar5GEncoder
+
+    return Polar5GEncoder(20, 40, **_device_kwargs(build_device))
+
+
+def _build_fec_polar_5g_decoder(build_device: str | None):
+    from sionna.phy.fec import Polar5GDecoder
+
+    return Polar5GDecoder(
+        _build_fec_polar_5g_encoder(build_device),
+        dec_type="SC",
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_fec_turbo_termination(build_device: str | None):
+    from sionna.phy.fec.turbo.utils import TurboTermination
+
+    return TurboTermination(3, **_device_kwargs(build_device))
+
+
+def _build_fec_turbo_encoder(build_device: str | None):
+    from sionna.phy.fec import TurboEncoder
+
+    return TurboEncoder(**_device_kwargs(build_device))
+
+
+def _build_fec_turbo_decoder(build_device: str | None):
+    from sionna.phy.fec import TurboDecoder
+
+    return TurboDecoder(
+        constraint_length=3,
+        num_iter=1,
+        **_device_kwargs(build_device),
+    )
+
+
 def _stream_management_1x1():
     import numpy as np
     from sionna.phy.mimo import StreamManagement
@@ -1324,6 +1568,223 @@ _CASES = (
         build=_build_root_raised_cosine_filter,
         make_inputs=_inputs_filter,
         categories=_categories("signal", "filter"),
+    ),
+    CaseSpec(
+        name="fec-gaussian-prior-source",
+        description="GaussianPriorSource; FEC helper that samples Gaussian LLR priors using Sionna device state.",
+        build=_build_fec_gaussian_prior_source,
+        make_inputs=None,
+        categories=_categories("fec", "source", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-crc-encoder",
+        description="CRCEncoder; FEC CRC encoder with generated CRC matrix state.",
+        build=_build_fec_crc_encoder,
+        make_inputs=None,
+        categories=_categories("fec", "crc", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-crc-decoder",
+        description="CRCDecoder; FEC CRC decoder that owns a CRCEncoder child block.",
+        build=_build_fec_crc_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "crc", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-trellis",
+        description="Trellis; convolutional-code helper with explicit device-managed tensor state.",
+        build=_build_fec_trellis,
+        make_inputs=None,
+        categories=_categories("fec", "conv", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-conv-encoder",
+        description="ConvEncoder; convolutional FEC encoder with nested Trellis state.",
+        build=_build_fec_conv_encoder,
+        make_inputs=None,
+        categories=_categories("fec", "conv", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-viterbi-decoder",
+        description="ViterbiDecoder; convolutional FEC decoder with trellis-derived state.",
+        build=_build_fec_viterbi_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "conv", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-bcjr-decoder",
+        description="BCJRDecoder; convolutional FEC decoder with trellis-derived state.",
+        build=_build_fec_bcjr_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "conv", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-row-column-interleaver",
+        description="RowColumnInterleaver; FEC interleaver with generated permutation state.",
+        build=_build_fec_row_column_interleaver,
+        make_inputs=None,
+        categories=_categories("fec", "interleaver", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-random-interleaver",
+        description="RandomInterleaver; FEC random interleaver with seed and device state.",
+        build=_build_fec_random_interleaver,
+        make_inputs=None,
+        categories=_categories("fec", "interleaver", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-turbo-3gpp-interleaver",
+        description="Turbo3GPPInterleaver; 3GPP turbo-code interleaver helper.",
+        build=_build_fec_turbo_3gpp_interleaver,
+        make_inputs=None,
+        categories=_categories("fec", "interleaver", "turbo", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-deinterleaver",
+        description="Deinterleaver; FEC deinterleaver wrapping a RandomInterleaver child block.",
+        build=_build_fec_deinterleaver,
+        make_inputs=None,
+        categories=_categories("fec", "interleaver", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-scrambler",
+        description="Scrambler; FEC scrambler with random sequence generation state.",
+        build=_build_fec_scrambler,
+        make_inputs=None,
+        categories=_categories("fec", "scrambling", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-tb5g-scrambler",
+        description="TB5GScrambler; 5G transport-block scrambler with generated sequence state.",
+        build=_build_fec_tb5g_scrambler,
+        make_inputs=None,
+        categories=_categories("fec", "scrambling", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-descrambler",
+        description="Descrambler; FEC descrambler wrapping a Scrambler child block.",
+        build=_build_fec_descrambler,
+        make_inputs=None,
+        categories=_categories("fec", "scrambling", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-linear-encoder",
+        description="LinearEncoder; generic linear block-code encoder with generator-matrix state.",
+        build=_build_fec_linear_encoder,
+        make_inputs=None,
+        categories=_categories("fec", "linear", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-os-decoder",
+        description="OSDecoder; ordered-statistics decoder with generator-matrix state.",
+        build=_build_fec_os_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "linear", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-ldpc-bp-decoder",
+        description="LDPCBPDecoder; belief-propagation decoder with parity-check graph tensors.",
+        build=_build_fec_ldpc_bp_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "ldpc", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-ldpc-5g-encoder",
+        description="LDPC5GEncoder; 5G LDPC encoder with base-graph lookup tensors.",
+        build=_build_fec_ldpc_5g_encoder,
+        make_inputs=None,
+        categories=_categories("fec", "ldpc", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-ldpc-5g-decoder",
+        description="LDPC5GDecoder; 5G LDPC decoder with encoder and BP decoder state.",
+        build=_build_fec_ldpc_5g_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "ldpc", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-exit-callback",
+        description="EXITCallback; LDPC decoder callback with registered metric buffers.",
+        build=_build_fec_exit_callback,
+        make_inputs=None,
+        categories=_categories("fec", "ldpc", "callback", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-decoder-statistics-callback",
+        description="DecoderStatisticsCallback; LDPC decoder callback with registered statistic buffers.",
+        build=_build_fec_decoder_statistics_callback,
+        make_inputs=None,
+        categories=_categories("fec", "ldpc", "callback", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-weighted-bp-callback",
+        description="WeightedBPCallback; LDPC weighted-BP callback with trainable edge weights.",
+        build=_build_fec_weighted_bp_callback,
+        make_inputs=None,
+        categories=_categories("fec", "ldpc", "callback", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-polar-encoder",
+        description="PolarEncoder; polar encoder with frozen-bit and gather-index tensors.",
+        build=_build_fec_polar_encoder,
+        make_inputs=None,
+        categories=_categories("fec", "polar", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-polar-sc-decoder",
+        description="PolarSCDecoder; polar successive-cancellation decoder state.",
+        build=_build_fec_polar_sc_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "polar", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-polar-scl-decoder",
+        description="PolarSCLDecoder; polar list decoder with frozen-bit and CRC child state.",
+        build=_build_fec_polar_scl_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "polar", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-polar-bp-decoder",
+        description="PolarBPDecoder; polar belief-propagation decoder state.",
+        build=_build_fec_polar_bp_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "polar", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-polar-5g-encoder",
+        description="Polar5GEncoder; 5G polar encoder with CRC, rate-matching, and interleaver state.",
+        build=_build_fec_polar_5g_encoder,
+        make_inputs=None,
+        categories=_categories("fec", "polar", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-polar-5g-decoder",
+        description="Polar5GDecoder; 5G polar decoder with nested encoder and decoder state.",
+        build=_build_fec_polar_5g_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "polar", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-turbo-termination",
+        description="TurboTermination; turbo-code termination helper with device-managed state.",
+        build=_build_fec_turbo_termination,
+        make_inputs=None,
+        categories=_categories("fec", "turbo", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-turbo-encoder",
+        description="TurboEncoder; turbo-code encoder with trellis, interleaver, and termination state.",
+        build=_build_fec_turbo_encoder,
+        make_inputs=None,
+        categories=_categories("fec", "turbo", "audit-only"),
+    ),
+    CaseSpec(
+        name="fec-turbo-decoder",
+        description="TurboDecoder; turbo-code decoder with BCJR and interleaver child state.",
+        build=_build_fec_turbo_decoder,
+        make_inputs=None,
+        categories=_categories("fec", "turbo", "audit-only"),
     ),
     CaseSpec(
         name="mimo-stream-management",

@@ -25,6 +25,7 @@ https://github.com/NVlabs/sionna
 +-- run_repro.py
 +-- docs/
 |   +-- channel-audit-findings.md
+|   +-- fec-audit-findings.md
 |   +-- mapping-signal-audit-findings.md
 |   +-- mimo-audit-findings.md
 |   +-- ofdm-audit-findings.md
@@ -84,6 +85,8 @@ The detailed plan for auditing all relevant `sionna.phy` objects is maintained
 in [docs/phy-audit-plan.md](docs/phy-audit-plan.md).
 Current channel-specific CUDA findings are summarized in
 [docs/channel-audit-findings.md](docs/channel-audit-findings.md).
+Current FEC CUDA findings are tracked in
+[docs/fec-audit-findings.md](docs/fec-audit-findings.md).
 Current mapping and signal CUDA findings are summarized in
 [docs/mapping-signal-audit-findings.md](docs/mapping-signal-audit-findings.md).
 Current MIMO CUDA findings are tracked in
@@ -122,7 +125,7 @@ python run_repro.py run --device cuda:0 --json-report reports/cuda0.json
 Run all current PHY dynamic cases on the target CUDA device:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
 ```
 
 Run focused category sweeps on the target CUDA device:
@@ -136,7 +139,7 @@ python run_repro.py run --category signal --device cuda:1 --json-report reports/
 Run only the post-`.to()` object-state audit for the current PHY case set:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --no-probe-forward --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
 ```
 
 By default, repro objects are constructed on CPU before PyTorch `.to(device)` is
@@ -225,13 +228,15 @@ is to check whether the same stale-device pattern appears across other
 
 Collected audit-only CUDA evidence so far:
 
-- Current umbrella PHY sweep after the standalone MIMO expansion: 83/83 cases
-  failed audit.
+- Latest collected umbrella PHY sweep: 113/114 current cases failed audit; the
+  standalone `fec-trellis` case passed.
 - `sionna.phy.channel`: 17/17 current cases failed audit.
 - `sionna.phy.mapping`: 14/14 current cases failed audit.
 - `sionna.phy.signal`: 12/12 current cases failed audit.
 - `sionna.phy.mimo`: 8/8 current cases failed audit.
 - Clean `sionna.phy.ofdm` sweep: 33/33 OFDM-category cases failed audit.
+- `sionna.phy.fec`: 30/31 current cases failed audit; standalone
+  `fec-trellis` passed.
 
 The current case set covers:
 
@@ -251,6 +256,9 @@ The current case set covers:
 - Signal blocks: `Upsampling`, `Downsampling`, window classes, and filter
   classes. Base `Window` and base `Filter` are audit-only cases because they
   do not have usable coefficients for a forward probe by themselves.
+- Standalone FEC blocks: CRC, convolutional, interleaver, scrambler, linear
+  block code, LDPC, polar, turbo, callback, and Gaussian-prior helper objects.
+  These are audit-only cases until safe forward probes are added.
 - Standalone MIMO blocks: `StreamManagement`, `List2LLR`,
   `List2LLRSimple`, `LinearDetector`, `MaximumLikelihoodDetector`,
   `KBestDetector`, `EPDetector`, and `MMSEPICDetector`. These are audit-only
@@ -264,7 +272,7 @@ Use the same target CUDA device that exposed the original bug and run the
 current umbrella audit-only sweep:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
 ```
 
 The command above constructs objects on CPU by default and then calls
@@ -275,11 +283,22 @@ PyTorch migration behavior rather than on Sionna's global default device.
 Use focused category sweeps when rechecking one area:
 
 ```bash
-python run_repro.py run --category mimo --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mimo-audit-cuda1.json
+python run_repro.py run --category fec --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/fec-audit-cuda1.json
 ```
 
-The current umbrella sweep covers all 83 dynamic cases. The next coverage
-expansion target is standalone `sionna.phy.fec` or `sionna.phy.nr` cases.
+The focused FEC CUDA report and the updated umbrella PHY CUDA report have both
+been collected. Use `--no-fail` when rerunning the umbrella sweep so the command
+still writes a complete report even though failed audit cases are expected:
+
+```bash
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
+```
+
+The next coverage expansion target after FEC is standalone `sionna.phy.nr`.
+
+If multiple audit commands are chained in one shell command, pass `--no-fail`
+to earlier commands. Failed audit cases are expected and otherwise stop `&&`
+chains before later reports are collected.
 
 Then run focused forward probes:
 

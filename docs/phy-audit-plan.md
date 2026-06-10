@@ -84,8 +84,9 @@ state in all 26 implemented non-channel cases. See
 the case-level summary.
 
 The first umbrella PHY sweep before standalone OFDM expansion found stale
-device state across all 43 dynamic cases. The current umbrella PHY sweep after
-standalone MIMO expansion found stale device state across all 83 dynamic cases.
+device state across all 43 dynamic cases. The latest collected umbrella PHY
+sweep after standalone FEC expansion found stale device state across 113 of
+114 dynamic cases, with only the standalone `fec-trellis` case passing.
 See [`docs/phy-audit-findings.md`](phy-audit-findings.md) for the current
 PHY-level summary.
 
@@ -95,6 +96,10 @@ OFDM-category cases. See
 
 The clean standalone MIMO sweep found stale device state in all 8 MIMO-category
 cases. See [`docs/mimo-audit-findings.md`](mimo-audit-findings.md).
+
+The clean standalone FEC sweep found stale device state in 30/31 FEC-category
+cases. The standalone `fec-trellis` case passed. See
+[`docs/fec-audit-findings.md`](fec-audit-findings.md).
 
 ## Audit workflow
 
@@ -157,7 +162,7 @@ For P0 classes, add minimal cases to the existing `run_repro.py` workflow.
 Initial command for clean state migration evidence:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
 ```
 
 Then run forward probes only for objects with small, reliable inputs:
@@ -218,6 +223,9 @@ Produce artifacts that can be shared with maintainers or collaborators:
 - [x] Add standalone `sionna.phy.mimo` dynamic cases.
 - [x] Run audit-only MIMO sweep on the CUDA server.
 - [x] Rerun umbrella PHY sweep after the standalone MIMO expansion.
+- [x] Add standalone `sionna.phy.fec` dynamic cases.
+- [x] Run audit-only FEC sweep on the CUDA server.
+- [x] Rerun umbrella PHY sweep after the standalone FEC expansion.
 - [ ] Run forward PHY sweep for safe cases.
 - [x] Summarize affected classes and failure modes for the current dynamic case
   set.
@@ -235,6 +243,8 @@ Implemented already:
 - `mapping` category with source, constellation, mapper, demapper, logits, and
   symbol-index conversion cases;
 - `signal` category with resampling, window, and filter cases;
+- `fec` category with CRC, convolutional, interleaver, scrambler, linear block
+  code, LDPC, polar, turbo, callback, and Gaussian-prior helper cases;
 - `mimo` category with stream management, list-to-LLR helpers, and standalone
   detector cases;
 - `ofdm` category with resource-grid, pilot, mapper/demapper, modem, channel
@@ -245,6 +255,7 @@ Implemented already:
   sets.
 - CPU smoke validation for the current OFDM case set.
 - CPU smoke validation for the current MIMO case set.
+- CPU smoke validation for the current FEC case set.
 - CUDA audit-only evidence for `channel`, `mapping`, and `signal` dynamic
   cases.
 - CUDA audit-only evidence for the first umbrella `phy` dynamic case set before
@@ -255,6 +266,9 @@ Implemented already:
 - Clean CUDA audit-only evidence for standalone `mimo` cases.
 - CUDA audit-only evidence for the current umbrella `phy` dynamic case set
   after standalone MIMO cases were added.
+- Clean CUDA audit-only evidence for standalone `fec` cases.
+- CUDA audit-only evidence for the current umbrella `phy` dynamic case set
+  after standalone FEC cases were added.
 
 Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
@@ -267,17 +281,9 @@ Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
 Not implemented yet:
 
-- dynamic repro cases for standalone `fec` and `nr` classes;
+- dynamic repro cases for standalone `nr` classes;
 - forward-probe CUDA reports for safe cases.
 
 ## Recommended next step
 
-Choose the next dynamic coverage area. The strongest remaining candidates from
-the local inventory are standalone `sionna.phy.fec` and `sionna.phy.nr`.
-
-```bash
-python tools/inspect_phy_inventory.py --json-report reports/phy-inventory.json
-```
-
-Use the inventory to decide whether `fec` or `nr` should be implemented next,
-then add a focused dynamic category before rerunning the umbrella `phy` audit.
+Add standalone `sionna.phy.nr` dynamic cases.
