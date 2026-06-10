@@ -120,9 +120,11 @@ on CPU after parent `.to(cuda:1)`.
 
 The focused FEC sweep confirms that `.to(device)` migration issues are also
 systematic across standalone `sionna.phy.fec` blocks. The updated umbrella PHY
-sweep across all 114 current dynamic cases found 113 failed cases, one passed
-standalone Trellis case, and 0 skipped. The next coverage target is standalone
-`sionna.phy.nr`.
+sweep across all 114 then-current dynamic cases found 113 failed cases, one passed
+standalone Trellis case, and 0 skipped. Standalone NR dynamic cases have now
+been added and audited: 12/12 failed and 0 skipped. The updated umbrella PHY
+sweep across all 126 current dynamic cases found 125 failed cases, one passed
+standalone Trellis case, and 0 skipped.
 
 ```bash
 python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json

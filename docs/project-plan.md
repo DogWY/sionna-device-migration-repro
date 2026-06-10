@@ -41,15 +41,17 @@ Prioritize these object categories:
 
 Current dynamic coverage includes `sionna.phy.channel`,
 `sionna.phy.mapping`, `sionna.phy.signal`, standalone `sionna.phy.fec`,
-standalone `sionna.phy.mimo`, and standalone `sionna.phy.ofdm` cases. The
-first 43 audit-only CUDA cases covering channel, mapping, and signal all failed
-after CPU construction followed by `.to(cuda:1)`. The clean OFDM CUDA audit
-found 33 failed OFDM-category cases and no skips. The clean MIMO CUDA audit
-found 8 failed MIMO-category cases and no skips. The clean FEC CUDA audit found
-30 failed FEC-category cases, one passed standalone Trellis case, and no skips.
-The latest collected umbrella PHY audit across the current 114-case dynamic set
-failed 113 cases, passed only `fec-trellis`, and had no skips. The next
-coverage target is standalone `sionna.phy.nr`.
+standalone `sionna.phy.nr`, standalone `sionna.phy.mimo`, and standalone
+`sionna.phy.ofdm` cases. The first 43 audit-only CUDA cases covering channel,
+mapping, and signal all failed after CPU construction followed by
+`.to(cuda:1)`. The clean OFDM CUDA audit found 33 failed OFDM-category cases
+and no skips. The clean MIMO CUDA audit found 8 failed MIMO-category cases and
+no skips. The clean FEC CUDA audit found 30 failed FEC-category cases, one
+passed standalone Trellis case, and no skips. The clean NR CUDA audit found 12
+failed NR-category cases and no skips. The latest collected umbrella PHY audit
+across the current 126-case dynamic set failed 125 cases, passed only
+`fec-trellis`, and had no skips. The next project target is an upstream-facing
+repro note, with forward-probe reports added only for safe cases.
 
 ## Phase 3: upstream report material
 

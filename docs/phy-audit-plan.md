@@ -85,8 +85,8 @@ the case-level summary.
 
 The first umbrella PHY sweep before standalone OFDM expansion found stale
 device state across all 43 dynamic cases. The latest collected umbrella PHY
-sweep after standalone FEC expansion found stale device state across 113 of
-114 dynamic cases, with only the standalone `fec-trellis` case passing.
+sweep after standalone NR expansion found stale device state across 125 of 126
+dynamic cases, with only the standalone `fec-trellis` case passing.
 See [`docs/phy-audit-findings.md`](phy-audit-findings.md) for the current
 PHY-level summary.
 
@@ -100,6 +100,9 @@ cases. See [`docs/mimo-audit-findings.md`](mimo-audit-findings.md).
 The clean standalone FEC sweep found stale device state in 30/31 FEC-category
 cases. The standalone `fec-trellis` case passed. See
 [`docs/fec-audit-findings.md`](fec-audit-findings.md).
+
+The clean standalone NR sweep found stale device state in all 12 NR-category
+cases. See [`docs/nr-audit-findings.md`](nr-audit-findings.md).
 
 ## Audit workflow
 
@@ -226,6 +229,10 @@ Produce artifacts that can be shared with maintainers or collaborators:
 - [x] Add standalone `sionna.phy.fec` dynamic cases.
 - [x] Run audit-only FEC sweep on the CUDA server.
 - [x] Rerun umbrella PHY sweep after the standalone FEC expansion.
+- [x] Add standalone `sionna.phy.nr` dynamic cases.
+- [x] Run CPU smoke validation for standalone NR cases.
+- [x] Run audit-only NR sweep on the CUDA server.
+- [x] Rerun umbrella PHY sweep after the standalone NR expansion.
 - [ ] Run forward PHY sweep for safe cases.
 - [x] Summarize affected classes and failure modes for the current dynamic case
   set.
@@ -245,6 +252,8 @@ Implemented already:
 - `signal` category with resampling, window, and filter cases;
 - `fec` category with CRC, convolutional, interleaver, scrambler, linear block
   code, LDPC, polar, turbo, callback, and Gaussian-prior helper cases;
+- `nr` category with layer mapping, TB encoder/decoder, PUSCH pilot, precoder,
+  transmitter, LS estimator, receiver, and NR utility helper cases;
 - `mimo` category with stream management, list-to-LLR helpers, and standalone
   detector cases;
 - `ofdm` category with resource-grid, pilot, mapper/demapper, modem, channel
@@ -256,6 +265,8 @@ Implemented already:
 - CPU smoke validation for the current OFDM case set.
 - CPU smoke validation for the current MIMO case set.
 - CPU smoke validation for the current FEC case set.
+- CPU smoke validation for the current NR case set.
+- CPU smoke validation for the current 126-case PHY set.
 - CUDA audit-only evidence for `channel`, `mapping`, and `signal` dynamic
   cases.
 - CUDA audit-only evidence for the first umbrella `phy` dynamic case set before
@@ -269,6 +280,9 @@ Implemented already:
 - Clean CUDA audit-only evidence for standalone `fec` cases.
 - CUDA audit-only evidence for the current umbrella `phy` dynamic case set
   after standalone FEC cases were added.
+- Clean CUDA audit-only evidence for standalone `nr` cases.
+- CUDA audit-only evidence for the current umbrella `phy` dynamic case set
+  after standalone NR cases were added.
 
 Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
@@ -281,9 +295,14 @@ Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
 Not implemented yet:
 
-- dynamic repro cases for standalone `nr` classes;
 - forward-probe CUDA reports for safe cases.
 
 ## Recommended next step
 
-Add standalone `sionna.phy.nr` dynamic cases.
+Prepare a short upstream-facing repro note from the current 126-case CUDA
+evidence. If more runtime behavior evidence is needed first, run focused
+forward probes for safe cases:
+
+```bash
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
+```

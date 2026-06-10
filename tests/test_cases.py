@@ -24,15 +24,19 @@ def test_case_registry_contains_core_cases():
     assert "fec-crc-encoder" in names
     assert "fec-ldpc-5g-encoder" in names
     assert "fec-polar-5g-decoder" in names
+    assert "nr-layer-mapper" in names
+    assert "nr-pusch-transmitter" in names
+    assert "nr-coded-awgn-channel" in names
 
 
-def test_case_registry_contains_phy_mapping_signal_fec_mimo_and_ofdm_categories():
+def test_case_registry_contains_phy_mapping_signal_fec_nr_mimo_and_ofdm_categories():
     cases = tuple(iter_cases())
 
     assert any("phy" in case.categories for case in cases)
     assert any("mapping" in case.categories for case in cases)
     assert any("signal" in case.categories for case in cases)
     assert any("fec" in case.categories for case in cases)
+    assert any("nr" in case.categories for case in cases)
     assert any("mimo" in case.categories for case in cases)
     assert any("ofdm" in case.categories for case in cases)
 

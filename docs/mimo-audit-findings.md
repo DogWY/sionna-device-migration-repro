@@ -102,6 +102,8 @@ Combined audit-only CUDA evidence so far:
 The updated umbrella PHY sweep after the MIMO expansion found 83/83
 then-current dynamic cases failed and 0 skipped. Standalone FEC cases have now
 been added and audited: 30/31 failed, one standalone Trellis case passed, and
-0 skipped. The updated umbrella PHY sweep across all 114 current dynamic cases
+0 skipped. The updated umbrella PHY sweep across all 114 then-current dynamic cases
 found 113 failed cases, one passed standalone Trellis case, and 0 skipped. The
-next coverage target is standalone `sionna.phy.nr`.
+standalone NR dynamic cases have now been added and audited: 12/12 failed and
+0 skipped. The updated umbrella PHY sweep across all 126 current dynamic cases
+found 125 failed cases, one passed standalone Trellis case, and 0 skipped.

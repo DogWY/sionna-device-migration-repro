@@ -763,6 +763,121 @@ def _build_fec_turbo_decoder(build_device: str | None):
     )
 
 
+def _nr_pusch_config():
+    from sionna.phy.nr import PUSCHConfig
+
+    config = PUSCHConfig()
+    config.carrier.n_size_grid = 1
+    config.symbol_allocation = [0, 4]
+    config.tb.mcs_index = 0
+    return config
+
+
+def _build_nr_layer_mapper(build_device: str | None):
+    from sionna.phy.nr import LayerMapper
+
+    return LayerMapper(num_layers=2, **_device_kwargs(build_device))
+
+
+def _build_nr_layer_demapper(build_device: str | None):
+    from sionna.phy.nr import LayerDemapper
+
+    return LayerDemapper(
+        _build_nr_layer_mapper(build_device),
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_nr_tb_encoder(build_device: str | None):
+    from sionna.phy.nr import TBEncoder
+
+    return TBEncoder(
+        target_tb_size=64,
+        num_coded_bits=192,
+        target_coderate=0.5,
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_nr_tb_decoder(build_device: str | None):
+    from sionna.phy.nr import TBDecoder
+
+    return TBDecoder(
+        _build_nr_tb_encoder(build_device),
+        num_bp_iter=1,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_nr_pusch_pilot_pattern(build_device: str | None):
+    from sionna.phy.nr import PUSCHPilotPattern
+
+    _ = build_device
+    return PUSCHPilotPattern(_nr_pusch_config())
+
+
+def _build_nr_pusch_precoder(build_device: str | None):
+    import numpy as np
+    from sionna.phy.nr import PUSCHPrecoder
+
+    precoding_matrices = [np.array([[1.0 + 0.0j]], dtype=np.complex64)]
+    return PUSCHPrecoder(precoding_matrices, **_device_kwargs(build_device))
+
+
+def _build_nr_pusch_transmitter(build_device: str | None):
+    from sionna.phy.nr import PUSCHTransmitter
+
+    return PUSCHTransmitter(_nr_pusch_config(), **_device_kwargs(build_device))
+
+
+def _build_nr_pusch_ls_channel_estimator(build_device: str | None):
+    from sionna.phy.nr import PUSCHLSChannelEstimator
+
+    transmitter = _build_nr_pusch_transmitter(build_device)
+    return PUSCHLSChannelEstimator(
+        transmitter.resource_grid,
+        transmitter._dmrs_length,
+        transmitter._dmrs_additional_position,
+        transmitter._num_cdm_groups_without_data,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_nr_pusch_receiver(build_device: str | None):
+    from sionna.phy.nr import PUSCHReceiver
+
+    return PUSCHReceiver(
+        _build_nr_pusch_transmitter(build_device),
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_nr_coded_awgn_channel(build_device: str | None):
+    from sionna.phy.nr import CodedAWGNChannelNR
+
+    return CodedAWGNChannelNR(
+        num_bits_per_symbol=2,
+        num_info_bits=64,
+        target_coderate=0.5,
+        num_iter_decoder=1,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_nr_mcs_decoder(build_device: str | None):
+    from sionna.phy.nr import MCSDecoderNR
+
+    return MCSDecoderNR(**_device_kwargs(build_device))
+
+
+def _build_nr_transport_block(build_device: str | None):
+    from sionna.phy.nr import TransportBlockNR
+
+    return TransportBlockNR(**_device_kwargs(build_device))
+
+
 def _stream_management_1x1():
     import numpy as np
     from sionna.phy.mimo import StreamManagement
@@ -1785,6 +1900,90 @@ _CASES = (
         build=_build_fec_turbo_decoder,
         make_inputs=None,
         categories=_categories("fec", "turbo", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-layer-mapper",
+        description="LayerMapper; NR MIMO layer mapping block with Sionna device state.",
+        build=_build_nr_layer_mapper,
+        make_inputs=None,
+        categories=_categories("nr", "layer-mapping", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-layer-demapper",
+        description="LayerDemapper; NR inverse layer mapping block tied to a LayerMapper child.",
+        build=_build_nr_layer_demapper,
+        make_inputs=None,
+        categories=_categories("nr", "layer-mapping", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-tb-encoder",
+        description="TBEncoder; 5G NR transport-block encoder with CRC, LDPC, and scrambling state.",
+        build=_build_nr_tb_encoder,
+        make_inputs=None,
+        categories=_categories("nr", "transport-block", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-tb-decoder",
+        description="TBDecoder; 5G NR transport-block decoder wrapping LDPC, descrambling, and CRC state.",
+        build=_build_nr_tb_decoder,
+        make_inputs=None,
+        categories=_categories("nr", "transport-block", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-pusch-pilot-pattern",
+        description="PUSCHPilotPattern; NR pilot pattern generated from a PUSCHConfig.",
+        build=_build_nr_pusch_pilot_pattern,
+        make_inputs=None,
+        categories=_categories("nr", "pusch", "pilot", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-pusch-precoder",
+        description="PUSCHPrecoder; NR PUSCH precoder with registered precoding matrix buffer.",
+        build=_build_nr_pusch_precoder,
+        make_inputs=None,
+        categories=_categories("nr", "pusch", "precoding", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-pusch-transmitter",
+        description="PUSCHTransmitter; composite NR transmitter with FEC, mapping, OFDM, and pilot state.",
+        build=_build_nr_pusch_transmitter,
+        make_inputs=None,
+        categories=_categories("nr", "pusch", "transmitter", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-pusch-ls-channel-estimator",
+        description="PUSCHLSChannelEstimator; NR LS estimator over a PUSCH resource grid.",
+        build=_build_nr_pusch_ls_channel_estimator,
+        make_inputs=None,
+        categories=_categories("nr", "pusch", "channel-estimation", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-pusch-receiver",
+        description="PUSCHReceiver; composite NR receiver with estimator, detector, demapper, and decoder state.",
+        build=_build_nr_pusch_receiver,
+        make_inputs=None,
+        categories=_categories("nr", "pusch", "receiver", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-coded-awgn-channel",
+        description="CodedAWGNChannelNR; NR coded AWGN link helper with source, mapper, channel, and decoder state.",
+        build=_build_nr_coded_awgn_channel,
+        make_inputs=None,
+        categories=_categories("nr", "utils", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-mcs-decoder",
+        description="MCSDecoderNR; NR MCS decoder helper with tensor lookup state.",
+        build=_build_nr_mcs_decoder,
+        make_inputs=None,
+        categories=_categories("nr", "utils", "audit-only"),
+    ),
+    CaseSpec(
+        name="nr-transport-block",
+        description="TransportBlockNR; NR transport-block helper with dynamic encoding state.",
+        build=_build_nr_transport_block,
+        make_inputs=None,
+        categories=_categories("nr", "utils", "audit-only"),
     ),
     CaseSpec(
         name="mimo-stream-management",
