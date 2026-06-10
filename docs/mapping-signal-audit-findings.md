@@ -133,9 +133,13 @@ The umbrella PHY audit report has now also been collected. See
 Standalone `sionna.phy.ofdm` dynamic cases have now been added and audited. The
 clean OFDM sweep found 33/33 OFDM-category cases failed and 0 skipped. The
 updated umbrella PHY sweep also found 75/75 current cases failed and 0 skipped.
-Next, add standalone `sionna.phy.mimo` cases. After those cases are
-implemented, run:
+Standalone `sionna.phy.mimo` cases have now been added and audited. The MIMO
+sweep found 8/8 failed cases and 0 skipped. The updated umbrella PHY sweep
+after the MIMO expansion found 83/83 current cases failed and 0 skipped. See
+[`mimo-audit-findings.md`](mimo-audit-findings.md) and
+[`phy-audit-findings.md`](phy-audit-findings.md). The next coverage target
+should be selected from standalone `sionna.phy.fec` or `sionna.phy.nr`.
 
 ```bash
-python run_repro.py run --category mimo --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mimo-audit-cuda1.json
+python tools/inspect_phy_inventory.py --json-report reports/phy-inventory.json
 ```

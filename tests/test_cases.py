@@ -19,14 +19,17 @@ def test_case_registry_contains_core_cases():
     assert "resource-grid-mapper" in names
     assert "ls-channel-estimator" in names
     assert "lmmse-equalizer" in names
+    assert "mimo-list2llr-simple" in names
+    assert "mimo-k-best-detector" in names
 
 
-def test_case_registry_contains_phy_mapping_signal_and_ofdm_categories():
+def test_case_registry_contains_phy_mapping_signal_mimo_and_ofdm_categories():
     cases = tuple(iter_cases())
 
     assert any("phy" in case.categories for case in cases)
     assert any("mapping" in case.categories for case in cases)
     assert any("signal" in case.categories for case in cases)
+    assert any("mimo" in case.categories for case in cases)
     assert any("ofdm" in case.categories for case in cases)
 
 

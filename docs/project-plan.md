@@ -40,12 +40,14 @@ Prioritize these object categories:
   random state, or many tensor attributes.
 
 Current dynamic coverage includes `sionna.phy.channel`,
-`sionna.phy.mapping`, `sionna.phy.signal`, and standalone `sionna.phy.ofdm`
-cases. The first 43 audit-only CUDA cases covering channel, mapping, and signal
-all failed after CPU construction followed by `.to(cuda:1)`. The clean OFDM
-CUDA audit found 33 failed OFDM-category cases and no skips. The updated
-umbrella PHY audit across the current 75-case dynamic set also failed 75/75
-cases with no skips. The next coverage target is standalone `sionna.phy.mimo`.
+`sionna.phy.mapping`, `sionna.phy.signal`, standalone `sionna.phy.mimo`, and
+standalone `sionna.phy.ofdm` cases. The first 43 audit-only CUDA cases covering
+channel, mapping, and signal all failed after CPU construction followed by
+`.to(cuda:1)`. The clean OFDM CUDA audit found 33 failed OFDM-category cases
+and no skips. The clean MIMO CUDA audit found 8 failed MIMO-category cases and
+no skips. The current umbrella PHY audit across the 83-case dynamic set failed
+83/83 cases with no skips. The next coverage target should be selected from
+standalone `sionna.phy.fec` or `sionna.phy.nr`.
 
 ## Phase 3: upstream report material
 

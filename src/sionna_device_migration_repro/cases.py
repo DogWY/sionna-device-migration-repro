@@ -526,6 +526,84 @@ def _stream_management_1x1():
     return StreamManagement(np.array([[1]], dtype=np.int32), 1)
 
 
+def _build_mimo_stream_management(build_device: str | None):
+    _ = build_device
+    return _stream_management_1x1()
+
+
+def _build_mimo_list2llr(build_device: str | None):
+    from sionna.phy.mimo import List2LLR
+
+    return List2LLR(**_device_kwargs(build_device))
+
+
+def _build_mimo_list2llr_simple(build_device: str | None):
+    from sionna.phy.mimo import List2LLRSimple
+
+    return List2LLRSimple(2, **_device_kwargs(build_device))
+
+
+def _build_mimo_linear_detector(build_device: str | None):
+    from sionna.phy.mimo import LinearDetector
+
+    return LinearDetector(
+        "lmmse",
+        "bit",
+        "app",
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_mimo_maximum_likelihood_detector(build_device: str | None):
+    from sionna.phy.mimo import MaximumLikelihoodDetector
+
+    return MaximumLikelihoodDetector(
+        "bit",
+        "app",
+        1,
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_mimo_k_best_detector(build_device: str | None):
+    from sionna.phy.mimo import KBestDetector
+
+    return KBestDetector(
+        "bit",
+        1,
+        4,
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_mimo_ep_detector(build_device: str | None):
+    from sionna.phy.mimo import EPDetector
+
+    return EPDetector(
+        "bit",
+        2,
+        **_device_kwargs(build_device),
+    )
+
+
+def _build_mimo_mmse_pic_detector(build_device: str | None):
+    from sionna.phy.mimo import MMSEPICDetector
+
+    return MMSEPICDetector(
+        "bit",
+        "app",
+        constellation_type="qam",
+        num_bits_per_symbol=2,
+        **_device_kwargs(build_device),
+    )
+
+
 def _resource_grid_empty(build_device: str | None):
     from sionna.phy.ofdm import ResourceGrid
 
@@ -1246,6 +1324,62 @@ _CASES = (
         build=_build_root_raised_cosine_filter,
         make_inputs=_inputs_filter,
         categories=_categories("signal", "filter"),
+    ),
+    CaseSpec(
+        name="mimo-stream-management",
+        description="StreamManagement; MIMO stream association metadata shared by OFDM MIMO blocks.",
+        build=_build_mimo_stream_management,
+        make_inputs=None,
+        categories=_categories("mimo", "stream-management", "audit-only"),
+    ),
+    CaseSpec(
+        name="mimo-list2llr",
+        description="List2LLR; audit-only MIMO candidate-list to LLR base block.",
+        build=_build_mimo_list2llr,
+        make_inputs=None,
+        categories=_categories("mimo", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="mimo-list2llr-simple",
+        description="List2LLRSimple; MIMO candidate-list to LLR helper with lookup tensors.",
+        build=_build_mimo_list2llr_simple,
+        make_inputs=None,
+        categories=_categories("mimo", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="mimo-linear-detector",
+        description="LinearDetector; standalone MIMO linear detector with mapping child blocks.",
+        build=_build_mimo_linear_detector,
+        make_inputs=None,
+        categories=_categories("mimo", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="mimo-maximum-likelihood-detector",
+        description="MaximumLikelihoodDetector; standalone MIMO ML detector with lookup tensors.",
+        build=_build_mimo_maximum_likelihood_detector,
+        make_inputs=None,
+        categories=_categories("mimo", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="mimo-k-best-detector",
+        description="KBestDetector; standalone MIMO K-best detector with precomputed tensor state.",
+        build=_build_mimo_k_best_detector,
+        make_inputs=None,
+        categories=_categories("mimo", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="mimo-ep-detector",
+        description="EPDetector; standalone MIMO expectation-propagation detector.",
+        build=_build_mimo_ep_detector,
+        make_inputs=None,
+        categories=_categories("mimo", "detector", "audit-only"),
+    ),
+    CaseSpec(
+        name="mimo-mmse-pic-detector",
+        description="MMSEPICDetector; standalone MIMO MMSE-PIC detector with mapping child blocks.",
+        build=_build_mimo_mmse_pic_detector,
+        make_inputs=None,
+        categories=_categories("mimo", "detector", "audit-only"),
     ),
     CaseSpec(
         name="resource-grid-empty",

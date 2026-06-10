@@ -26,6 +26,7 @@ https://github.com/NVlabs/sionna
 +-- docs/
 |   +-- channel-audit-findings.md
 |   +-- mapping-signal-audit-findings.md
+|   +-- mimo-audit-findings.md
 |   +-- ofdm-audit-findings.md
 |   +-- phy-audit-findings.md
 |   +-- phy-audit-plan.md
@@ -85,6 +86,8 @@ Current channel-specific CUDA findings are summarized in
 [docs/channel-audit-findings.md](docs/channel-audit-findings.md).
 Current mapping and signal CUDA findings are summarized in
 [docs/mapping-signal-audit-findings.md](docs/mapping-signal-audit-findings.md).
+Current MIMO CUDA findings are tracked in
+[docs/mimo-audit-findings.md](docs/mimo-audit-findings.md).
 The current umbrella PHY CUDA summary is maintained in
 [docs/phy-audit-findings.md](docs/phy-audit-findings.md).
 Current OFDM CUDA findings are tracked in
@@ -119,7 +122,7 @@ python run_repro.py run --device cuda:0 --json-report reports/cuda0.json
 Run all current PHY dynamic cases on the target CUDA device:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --json-report reports/phy-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/phy-audit-cuda1.json
 ```
 
 Run focused category sweeps on the target CUDA device:
@@ -222,11 +225,12 @@ is to check whether the same stale-device pattern appears across other
 
 Collected audit-only CUDA evidence so far:
 
-- Current umbrella PHY sweep after the standalone OFDM expansion: 75/75 cases
+- Current umbrella PHY sweep after the standalone MIMO expansion: 83/83 cases
   failed audit.
 - `sionna.phy.channel`: 17/17 current cases failed audit.
 - `sionna.phy.mapping`: 14/14 current cases failed audit.
 - `sionna.phy.signal`: 12/12 current cases failed audit.
+- `sionna.phy.mimo`: 8/8 current cases failed audit.
 - Clean `sionna.phy.ofdm` sweep: 33/33 OFDM-category cases failed audit.
 
 The current case set covers:
@@ -247,6 +251,10 @@ The current case set covers:
 - Signal blocks: `Upsampling`, `Downsampling`, window classes, and filter
   classes. Base `Window` and base `Filter` are audit-only cases because they
   do not have usable coefficients for a forward probe by themselves.
+- Standalone MIMO blocks: `StreamManagement`, `List2LLR`,
+  `List2LLRSimple`, `LinearDetector`, `MaximumLikelihoodDetector`,
+  `KBestDetector`, `EPDetector`, and `MMSEPICDetector`. These are audit-only
+  cases until safe forward probes are added.
 - Standalone OFDM blocks: resource grids, pilot patterns, grid mappers and
   demappers, OFDM modulation/demodulation, channel estimators, equalizers,
   detector wrappers, detectors, and precoding helpers. Complex detector and
@@ -267,10 +275,11 @@ PyTorch migration behavior rather than on Sionna's global default device.
 Use focused category sweeps when rechecking one area:
 
 ```bash
-python run_repro.py run --category ofdm --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/ofdm-audit-cuda1.json
+python run_repro.py run --category mimo --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mimo-audit-cuda1.json
 ```
 
-The next coverage expansion target is standalone `sionna.phy.mimo` cases.
+The current umbrella sweep covers all 83 dynamic cases. The next coverage
+expansion target is standalone `sionna.phy.fec` or `sionna.phy.nr` cases.
 
 Then run focused forward probes:
 

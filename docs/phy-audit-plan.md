@@ -85,13 +85,16 @@ the case-level summary.
 
 The first umbrella PHY sweep before standalone OFDM expansion found stale
 device state across all 43 dynamic cases. The current umbrella PHY sweep after
-standalone OFDM expansion found stale device state across all 75 dynamic cases.
+standalone MIMO expansion found stale device state across all 83 dynamic cases.
 See [`docs/phy-audit-findings.md`](phy-audit-findings.md) for the current
 PHY-level summary.
 
 The clean standalone OFDM sweep found stale device state in all 33
 OFDM-category cases. See
 [`docs/ofdm-audit-findings.md`](ofdm-audit-findings.md).
+
+The clean standalone MIMO sweep found stale device state in all 8 MIMO-category
+cases. See [`docs/mimo-audit-findings.md`](mimo-audit-findings.md).
 
 ## Audit workflow
 
@@ -212,6 +215,9 @@ Produce artifacts that can be shared with maintainers or collaborators:
 - [x] Add construction-time Sionna `config.device` guard for `--build-device`.
 - [x] Rerun audit-only OFDM sweep after the construction-device fix.
 - [x] Run updated umbrella PHY sweep after the standalone OFDM expansion.
+- [x] Add standalone `sionna.phy.mimo` dynamic cases.
+- [x] Run audit-only MIMO sweep on the CUDA server.
+- [x] Rerun umbrella PHY sweep after the standalone MIMO expansion.
 - [ ] Run forward PHY sweep for safe cases.
 - [x] Summarize affected classes and failure modes for the current dynamic case
   set.
@@ -229,6 +235,8 @@ Implemented already:
 - `mapping` category with source, constellation, mapper, demapper, logits, and
   symbol-index conversion cases;
 - `signal` category with resampling, window, and filter cases;
+- `mimo` category with stream management, list-to-LLR helpers, and standalone
+  detector cases;
 - `ofdm` category with resource-grid, pilot, mapper/demapper, modem, channel
   estimator, equalizer, detector, and precoding cases;
 - `phy` umbrella category across the current dynamic case set;
@@ -236,6 +244,7 @@ Implemented already:
 - CPU smoke validation for the current channel, mapping, signal, and PHY case
   sets.
 - CPU smoke validation for the current OFDM case set.
+- CPU smoke validation for the current MIMO case set.
 - CUDA audit-only evidence for `channel`, `mapping`, and `signal` dynamic
   cases.
 - CUDA audit-only evidence for the first umbrella `phy` dynamic case set before
@@ -243,6 +252,9 @@ Implemented already:
 - Clean CUDA audit-only evidence for standalone `ofdm` cases.
 - CUDA audit-only evidence for the current umbrella `phy` dynamic case set
   after standalone OFDM cases were added.
+- Clean CUDA audit-only evidence for standalone `mimo` cases.
+- CUDA audit-only evidence for the current umbrella `phy` dynamic case set
+  after standalone MIMO cases were added.
 
 Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
@@ -255,16 +267,17 @@ Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
 Not implemented yet:
 
-- dynamic repro cases for standalone `mimo`, `fec`, and `nr` classes;
+- dynamic repro cases for standalone `fec` and `nr` classes;
 - forward-probe CUDA reports for safe cases.
 
 ## Recommended next step
 
-Add standalone `sionna.phy.mimo` dynamic cases, then run:
+Choose the next dynamic coverage area. The strongest remaining candidates from
+the local inventory are standalone `sionna.phy.fec` and `sionna.phy.nr`.
 
 ```bash
-python run_repro.py run --category mimo --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mimo-audit-cuda1.json
+python tools/inspect_phy_inventory.py --json-report reports/phy-inventory.json
 ```
 
-After the MIMO report is collected, decide whether to add `fec` or `nr` cases
-next.
+Use the inventory to decide whether `fec` or `nr` should be implemented next,
+then add a focused dynamic category before rerunning the umbrella `phy` audit.
