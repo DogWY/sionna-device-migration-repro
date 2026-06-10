@@ -1,8 +1,7 @@
 # Sionna device migration repro
 
 This repository reproduces and diagnoses device migration issues in Sionna PHY
-channel objects when they are used as PyTorch modules and moved with
-`.to(device)`.
+objects when they are used as PyTorch modules and moved with `.to(device)`.
 
 The goal is not to reimplement communication channel models. The goal is to
 turn the observed behavior into small, reproducible evidence that can be used
@@ -108,16 +107,24 @@ Run all built-in CUDA repros and write a JSON report:
 python run_repro.py run --device cuda:0 --json-report reports/cuda0.json
 ```
 
-Run all channel-related cases on the target CUDA device:
+Run all current PHY dynamic cases on the target CUDA device:
+
+```bash
+python run_repro.py run --category phy --device cuda:1 --json-report reports/phy-cuda1.json
+```
+
+Run focused category sweeps on the target CUDA device:
 
 ```bash
 python run_repro.py run --category channel --device cuda:1 --json-report reports/channel-cuda1.json
+python run_repro.py run --category mapping --device cuda:1 --json-report reports/mapping-cuda1.json
+python run_repro.py run --category signal --device cuda:1 --json-report reports/signal-cuda1.json
 ```
 
-Run only the post-`.to()` object-state audit for all channel-related cases:
+Run only the post-`.to()` object-state audit for the current PHY case set:
 
 ```bash
-python run_repro.py run --category channel --device cuda:1 --no-probe-forward --json-report reports/channel-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --no-probe-forward --json-report reports/phy-audit-cuda1.json
 ```
 
 By default, repro objects are constructed on CPU before PyTorch `.to(device)` is
@@ -198,11 +205,11 @@ The suspected failure path is:
   normalization power.
 - The final operation can then mix CPU and CUDA tensors and fail.
 
-## Broader channel sweep
+## Broader PHY sweep
 
 The AWGN wrapper is only the first concrete failure. The more useful next step
-is to check whether the same stale-device pattern appears across other Sionna
-channel-related objects.
+is to check whether the same stale-device pattern appears across other
+`sionna.phy` objects.
 
 The current case set covers:
 
@@ -215,22 +222,31 @@ The current case set covers:
   `BinaryErasureChannel`, `BinaryZChannel`.
 - Channel model: `RayleighBlockFading`.
 - Optical channel blocks: `EDFA`, `SSFM`.
+- Mapping blocks: `BinarySource`, `Constellation`, `Mapper`, `Demapper`,
+  `SymbolDemapper`, `LLRs2SymbolLogits`, `SymbolLogits2LLRs`,
+  `SymbolInds2Bits`, `SymbolLogits2Moments`, `PAM2QAM`, `QAM2PAM`,
+  `PAMSource`, `QAMSource`, and `SymbolSource`.
+- Signal blocks: `Upsampling`, `Downsampling`, window classes, and filter
+  classes. Base `Window` and base `Filter` are audit-only cases because they
+  do not have usable coefficients for a forward probe by themselves.
 
 Use the same target CUDA device that exposed the original bug and run an
 audit-only sweep first:
 
 ```bash
-python run_repro.py run --category channel --device cuda:1 --no-probe-forward --json-report reports/channel-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --no-probe-forward --json-report reports/phy-audit-cuda1.json
 ```
 
 The command above constructs objects on CPU by default and then calls
 `.to(cuda:1)`. This keeps the audit focused on PyTorch migration behavior rather
 than on Sionna's global default device.
 
-Then run the forward probes for the same case set:
+Then run focused forward probes:
 
 ```bash
-python run_repro.py run --category channel --device cuda:1 --json-report reports/channel-forward-cuda1.json
+python run_repro.py run --category mapping --device cuda:1 --json-report reports/mapping-forward-cuda1.json
+python run_repro.py run --category signal --device cuda:1 --json-report reports/signal-forward-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --json-report reports/phy-forward-cuda1.json
 ```
 
 The key signal is not whether `cuda:1` differs from another GPU. The key signal
@@ -247,10 +263,13 @@ CaseSpec(
     description="short description",
     build=build_my_channel,
     make_inputs=make_my_channel_inputs,
+    categories=_categories("channel", "my-area"),
 )
 ```
 
 `build` should construct the object on CPU by default. The runner calls
 `.to(args.device)` consistently. `make_inputs(device)` should return inputs
 already placed on the target device so stale Sionna logical device state can be
-observed directly.
+observed directly. `categories` should include the relevant focused area
+(`channel`, `mapping`, `signal`, and so on); `_categories(...)` automatically
+adds the umbrella `phy` category.

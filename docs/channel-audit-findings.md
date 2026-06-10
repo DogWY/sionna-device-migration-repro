@@ -126,11 +126,16 @@ Two separate migration gaps are now documented:
 
 ## Next step
 
-Extend dynamic repro coverage beyond `sionna.phy.channel`, prioritizing:
+Dynamic repro coverage has now been extended beyond `sionna.phy.channel` for:
 
-1. `sionna.phy.mapping`
-2. `sionna.phy.signal`
-3. `sionna.phy.ofdm`
+- `sionna.phy.mapping`
+- `sionna.phy.signal`
 
-These areas have P0 classes in the static inventory and should be easier to
-construct than many `fec`, `mimo`, and `nr` classes.
+The next CUDA-server step is to collect audit-only reports for those categories:
+
+```bash
+python run_repro.py run --category mapping --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mapping-audit-cuda1.json
+python run_repro.py run --category signal --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/signal-audit-cuda1.json
+```
+
+After that, extend dynamic coverage to standalone `sionna.phy.ofdm` classes.

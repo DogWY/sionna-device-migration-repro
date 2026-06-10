@@ -12,6 +12,18 @@ def test_case_registry_contains_core_cases():
     assert "edfa" in names
     assert "flat-fading" in names
     assert "kronecker-flat-fading" in names
+    assert "mapper-qam" in names
+    assert "llrs2symbol-logits" in names
+    assert "custom-window" in names
+    assert "root-raised-cosine-filter" in names
+
+
+def test_case_registry_contains_phy_mapping_and_signal_categories():
+    cases = tuple(iter_cases())
+
+    assert any("phy" in case.categories for case in cases)
+    assert any("mapping" in case.categories for case in cases)
+    assert any("signal" in case.categories for case in cases)
 
 
 def test_get_case_rejects_unknown_name():

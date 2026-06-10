@@ -185,11 +185,13 @@ Produce artifacts that can be shared with maintainers or collaborators:
 
 - [x] Add `tools/inspect_phy_inventory.py`.
 - [ ] Generate `reports/phy-inventory.json` on the Ubuntu CUDA server.
-- [ ] Add category support for `phy` once non-channel PHY cases are included.
-- [ ] Expand dynamic cases beyond `sionna.phy.channel`.
-- [ ] Keep `channel` cases as a subset category for focused reruns.
+- [x] Add category support for `phy` once non-channel PHY cases are included.
+- [x] Expand dynamic cases beyond `sionna.phy.channel` for
+  `sionna.phy.mapping` and `sionna.phy.signal`.
+- [x] Keep `channel` cases as a subset category for focused reruns.
 - [x] Run audit-only channel sweep on the CUDA server.
 - [ ] Run audit-only PHY sweep on the CUDA server.
+- [ ] Run audit-only mapping and signal sweeps on the CUDA server.
 - [ ] Run forward PHY sweep for safe cases.
 - [ ] Summarize affected classes and failure modes.
 - [ ] Prepare a short upstream-facing repro note.
@@ -203,8 +205,13 @@ Implemented already:
 - recursive device audit helper;
 - JSON report output;
 - `channel` category with multiple `sionna.phy.channel` cases;
+- `mapping` category with source, constellation, mapper, demapper, logits, and
+  symbol-index conversion cases;
+- `signal` category with resampling, window, and filter cases;
+- `phy` umbrella category across the current dynamic case set;
 - primary user wrapper repro: `wrapped-awgn-channel`;
-- CPU smoke validation for the current channel case set.
+- CPU smoke validation for the current channel, mapping, signal, and PHY case
+  sets.
 
 Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
@@ -217,11 +224,19 @@ Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
 Not implemented yet:
 
-- dynamic repro cases for `ofdm`, `mimo`, `mapping`, `signal`, `fec`, and `nr`;
+- dynamic repro cases for standalone `ofdm`, `mimo`, `fec`, and `nr` classes;
 - final PHY-wide CUDA audit reports.
 
 ## Recommended next step
 
-Run `tools/inspect_phy_inventory.py` in the Ubuntu CUDA environment and use the
-P0/P1 output to decide which non-channel PHY classes deserve dynamic repro
-cases next.
+Run the new `mapping`, `signal`, and umbrella `phy` dynamic cases in the Ubuntu
+CUDA environment:
+
+```bash
+python run_repro.py run --category mapping --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mapping-audit-cuda1.json
+python run_repro.py run --category signal --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/signal-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/phy-audit-cuda1.json
+```
+
+After those reports are collected, prioritize standalone `sionna.phy.ofdm`
+dynamic cases next.
