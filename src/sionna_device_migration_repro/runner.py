@@ -16,6 +16,8 @@ class CaseResult:
     name: str
     status: str
     description: str
+    build_device: str
+    target_device: str
     issues: list[DeviceIssue]
     forward_issues: list[DeviceIssue]
     forward_error: str | None = None
@@ -51,17 +53,21 @@ def run_case(
     case: CaseSpec,
     *,
     device: str,
+    build_device: str | None = "cpu",
     probe_forward: bool = True,
     include_private: bool = True,
     max_depth: int = 8,
 ) -> CaseResult:
+    build_device_label = "default" if build_device is None else build_device
     try:
-        obj = case.build()
+        obj = case.build(build_device)
     except Exception as exc:
         return CaseResult(
             name=case.name,
             status="skipped",
             description=case.description,
+            build_device=build_device_label,
+            target_device=device,
             issues=[],
             forward_issues=[],
             skip_reason=f"build failed: {type(exc).__name__}: {exc}",
@@ -74,6 +80,8 @@ def run_case(
             name=case.name,
             status="failed",
             description=case.description,
+            build_device=build_device_label,
+            target_device=device,
             issues=[],
             forward_issues=[],
             forward_error=f".to({device!r}) failed: {type(exc).__name__}: {exc}",
@@ -107,6 +115,8 @@ def run_case(
         name=case.name,
         status=status,
         description=case.description,
+        build_device=build_device_label,
+        target_device=device,
         issues=issues,
         forward_issues=forward_issues,
         forward_error=forward_error,

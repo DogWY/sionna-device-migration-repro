@@ -25,9 +25,12 @@ https://github.com/NVlabs/sionna
 .
 +-- run_repro.py
 +-- docs/
+|   +-- channel-audit-findings.md
+|   +-- phy-audit-plan.md
 |   `-- project-plan.md
 +-- examples/
-|   `-- minimal_awgn_to_cuda.py
+|   +-- minimal_awgn_to_cuda.py
+|   `-- wrapped_awgn_channel_to_cuda.py
 +-- reports/
 |   `-- .gitkeep
 +-- scripts/
@@ -40,6 +43,8 @@ https://github.com/NVlabs/sionna
 |       +-- env.py
 |       +-- repros.py
 |       `-- runner.py
++-- tools/
+|   `-- inspect_phy_inventory.py
 `-- tests/
     +-- conftest.py
     +-- test_audit.py
@@ -74,6 +79,8 @@ be designed for multi-GPU CUDA systems, not only for a single local GPU.
 
 The detailed plan for auditing all relevant `sionna.phy` objects is maintained
 in [docs/phy-audit-plan.md](docs/phy-audit-plan.md).
+Current channel-specific CUDA findings are summarized in
+[docs/channel-audit-findings.md](docs/channel-audit-findings.md).
 
 ## Quick start
 
@@ -87,6 +94,12 @@ Collect environment information:
 
 ```bash
 python run_repro.py env
+```
+
+Build a static inventory of `sionna.phy` classes:
+
+```bash
+python tools/inspect_phy_inventory.py --json-report reports/phy-inventory.json
 ```
 
 Run all built-in CUDA repros and write a JSON report:
@@ -105,6 +118,16 @@ Run only the post-`.to()` object-state audit for all channel-related cases:
 
 ```bash
 python run_repro.py run --category channel --device cuda:1 --no-probe-forward --json-report reports/channel-audit-cuda1.json
+```
+
+By default, repro objects are constructed on CPU before PyTorch `.to(device)` is
+called. This avoids accidental construction on Sionna's global default device
+such as `cuda:0`, which can cause unrelated out-of-memory failures before the
+audit even starts. To intentionally keep Sionna's global default construction
+behavior, use:
+
+```bash
+python run_repro.py run --case wrapped-awgn-channel --device cuda:1 --build-device default
 ```
 
 Run only the minimal AWGN case:
@@ -199,6 +222,10 @@ audit-only sweep first:
 ```bash
 python run_repro.py run --category channel --device cuda:1 --no-probe-forward --json-report reports/channel-audit-cuda1.json
 ```
+
+The command above constructs objects on CPU by default and then calls
+`.to(cuda:1)`. This keeps the audit focused on PyTorch migration behavior rather
+than on Sionna's global default device.
 
 Then run the forward probes for the same case set:
 

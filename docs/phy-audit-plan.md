@@ -67,6 +67,17 @@ This is enough to justify a broader `sionna.phy` audit. Further work should not
 focus on comparing different GPU indices. It should focus on which PHY classes
 exhibit the same stale logical device pattern.
 
+The first Ubuntu channel sweep also showed that some cases failed during object
+construction with CUDA out-of-memory errors because Sionna's global default
+device was `cuda:0`. The repro runner now defaults to constructing cases on
+CPU before calling `.to(target_device)`. Use `--build-device default` only when
+the goal is to reproduce Sionna's global default construction behavior.
+
+A clean channel sweep with `--build-device cpu` found stale device state in all
+17 implemented channel cases. See
+[`docs/channel-audit-findings.md`](channel-audit-findings.md) for the case-level
+summary.
+
 ## Audit workflow
 
 ### Phase 1: inventory `sionna.phy`
@@ -128,7 +139,7 @@ For P0 classes, add minimal cases to the existing `run_repro.py` workflow.
 Initial command for clean state migration evidence:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --no-probe-forward --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/phy-audit-cuda1.json
 ```
 
 Then run forward probes only for objects with small, reliable inputs:
@@ -139,7 +150,7 @@ python run_repro.py run --category phy --device cuda:1 --json-report reports/phy
 
 Dynamic cases should:
 
-- construct the object on the default device;
+- construct the object on a controlled build device, CPU by default;
 - call `.to(target_device)` through PyTorch;
 - audit registered tensors, ordinary tensors, child modules, and logical device
   fields;
@@ -172,11 +183,12 @@ Produce artifacts that can be shared with maintainers or collaborators:
 
 ## Implementation checklist
 
-- [ ] Add `tools/inspect_phy_inventory.py`.
+- [x] Add `tools/inspect_phy_inventory.py`.
 - [ ] Generate `reports/phy-inventory.json` on the Ubuntu CUDA server.
 - [ ] Add category support for `phy` once non-channel PHY cases are included.
 - [ ] Expand dynamic cases beyond `sionna.phy.channel`.
 - [ ] Keep `channel` cases as a subset category for focused reruns.
+- [x] Run audit-only channel sweep on the CUDA server.
 - [ ] Run audit-only PHY sweep on the CUDA server.
 - [ ] Run forward PHY sweep for safe cases.
 - [ ] Summarize affected classes and failure modes.
@@ -187,20 +199,29 @@ Produce artifacts that can be shared with maintainers or collaborators:
 Implemented already:
 
 - repository-local entrypoint: `python run_repro.py`;
+- static PHY inventory script: `tools/inspect_phy_inventory.py`;
 - recursive device audit helper;
 - JSON report output;
 - `channel` category with multiple `sionna.phy.channel` cases;
 - primary user wrapper repro: `wrapped-awgn-channel`;
 - CPU smoke validation for the current channel case set.
 
+Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
+
+- total classes under `sionna.phy`: 176;
+- import errors: 0;
+- risk counts: P0 = 157, P1 = 2, P2 = 17;
+- P0 classes by area: `channel` = 40, `ofdm` = 36, `fec` = 30,
+  `mapping` = 14, `signal` = 12, `nr` = 12, `mimo` = 8, `utils` = 3,
+  plus core `Object`/`Block`.
+
 Not implemented yet:
 
-- automated recursive inventory for all `sionna.phy`;
 - dynamic repro cases for `ofdm`, `mimo`, `mapping`, `signal`, `fec`, and `nr`;
 - final PHY-wide CUDA audit reports.
 
 ## Recommended next step
 
-Implement `tools/inspect_phy_inventory.py` first. It is the lowest-risk way to
-avoid missing affected PHY classes and to decide which objects deserve dynamic
-repro cases.
+Run `tools/inspect_phy_inventory.py` in the Ubuntu CUDA environment and use the
+P0/P1 output to decide which non-channel PHY classes deserve dynamic repro
+cases next.

@@ -7,13 +7,14 @@ from typing import Any, Callable
 
 
 InputFactory = Callable[[str], tuple[tuple[Any, ...], dict[str, Any]]]
+BuildFactory = Callable[[str | None], Any]
 
 
 @dataclass(frozen=True)
 class CaseSpec:
     name: str
     description: str
-    build: Callable[[], Any]
+    build: BuildFactory
     make_inputs: InputFactory | None = None
     categories: tuple[str, ...] = ("channel",)
 
@@ -50,10 +51,14 @@ def _torch():
     return torch
 
 
-def _build_awgn():
+def _device_kwargs(build_device: str | None) -> dict[str, str]:
+    return {} if build_device is None else {"device": build_device}
+
+
+def _build_awgn(build_device: str | None):
     from sionna.phy.channel import AWGN
 
-    return AWGN()
+    return AWGN(**_device_kwargs(build_device))
 
 
 def _inputs_awgn(device: str):
@@ -63,10 +68,10 @@ def _inputs_awgn(device: str):
     return (x, no), {}
 
 
-def _build_generate_flat_fading_channel():
+def _build_generate_flat_fading_channel(build_device: str | None):
     from sionna.phy.channel import GenerateFlatFadingChannel
 
-    return GenerateFlatFadingChannel(num_tx_ant=2, num_rx_ant=3)
+    return GenerateFlatFadingChannel(num_tx_ant=2, num_rx_ant=3, **_device_kwargs(build_device))
 
 
 def _inputs_generate_flat_fading_channel(device: str):
@@ -74,10 +79,10 @@ def _inputs_generate_flat_fading_channel(device: str):
     return (4,), {}
 
 
-def _build_wrapped_awgn_channel():
+def _build_wrapped_awgn_channel(build_device: str | None):
     from .repros import AWGNChannel
 
-    return AWGNChannel(snr=10)
+    return AWGNChannel(snr=10, device=build_device)
 
 
 def _inputs_wrapped_awgn_channel(device: str):
@@ -86,10 +91,10 @@ def _inputs_wrapped_awgn_channel(device: str):
     return (x,), {}
 
 
-def _build_apply_flat_fading_channel():
+def _build_apply_flat_fading_channel(build_device: str | None):
     from sionna.phy.channel import ApplyFlatFadingChannel
 
-    return ApplyFlatFadingChannel()
+    return ApplyFlatFadingChannel(**_device_kwargs(build_device))
 
 
 def _inputs_apply_flat_fading_channel(device: str):
@@ -100,10 +105,10 @@ def _inputs_apply_flat_fading_channel(device: str):
     return (x, h, no), {}
 
 
-def _build_apply_ofdm_channel():
+def _build_apply_ofdm_channel(build_device: str | None):
     from sionna.phy.channel import ApplyOFDMChannel
 
-    return ApplyOFDMChannel()
+    return ApplyOFDMChannel(**_device_kwargs(build_device))
 
 
 def _inputs_apply_ofdm_channel(device: str):
@@ -114,10 +119,10 @@ def _inputs_apply_ofdm_channel(device: str):
     return (x, h_freq, no), {}
 
 
-def _build_apply_time_channel():
+def _build_apply_time_channel(build_device: str | None):
     from sionna.phy.channel import ApplyTimeChannel
 
-    return ApplyTimeChannel(num_time_samples=8, l_tot=3)
+    return ApplyTimeChannel(num_time_samples=8, l_tot=3, **_device_kwargs(build_device))
 
 
 def _inputs_apply_time_channel(device: str):
@@ -128,10 +133,15 @@ def _inputs_apply_time_channel(device: str):
     return (x, h_time, no), {}
 
 
-def _build_flat_fading_channel():
+def _build_flat_fading_channel(build_device: str | None):
     from sionna.phy.channel import FlatFadingChannel
 
-    return FlatFadingChannel(num_tx_ant=2, num_rx_ant=3, return_channel=True)
+    return FlatFadingChannel(
+        num_tx_ant=2,
+        num_rx_ant=3,
+        return_channel=True,
+        **_device_kwargs(build_device),
+    )
 
 
 def _inputs_flat_fading_channel(device: str):
@@ -141,28 +151,29 @@ def _inputs_flat_fading_channel(device: str):
     return (x, no), {}
 
 
-def _build_kronecker_flat_fading_channel():
+def _build_kronecker_flat_fading_channel(build_device: str | None):
     import torch
     from sionna.phy.channel import FlatFadingChannel, KroneckerModel
 
     r_tx = torch.eye(2, dtype=torch.complex64)
     r_rx = torch.eye(3, dtype=torch.complex64)
-    spatial_corr = KroneckerModel(r_tx=r_tx, r_rx=r_rx)
+    spatial_corr = KroneckerModel(r_tx=r_tx, r_rx=r_rx, **_device_kwargs(build_device))
     return FlatFadingChannel(
         num_tx_ant=2,
         num_rx_ant=3,
         spatial_corr=spatial_corr,
         return_channel=True,
+        **_device_kwargs(build_device),
     )
 
 
-def _build_kronecker_model():
+def _build_kronecker_model(build_device: str | None):
     import torch
     from sionna.phy.channel import KroneckerModel
 
     r_tx = torch.eye(2, dtype=torch.complex64)
     r_rx = torch.eye(3, dtype=torch.complex64)
-    return KroneckerModel(r_tx=r_tx, r_rx=r_rx)
+    return KroneckerModel(r_tx=r_tx, r_rx=r_rx, **_device_kwargs(build_device))
 
 
 def _inputs_kronecker_model(device: str):
@@ -171,12 +182,12 @@ def _inputs_kronecker_model(device: str):
     return (h,), {}
 
 
-def _build_per_column_model():
+def _build_per_column_model(build_device: str | None):
     import torch
     from sionna.phy.channel import PerColumnModel
 
     r_rx = torch.eye(3, dtype=torch.complex64).repeat(2, 1, 1)
-    return PerColumnModel(r_rx=r_rx)
+    return PerColumnModel(r_rx=r_rx, **_device_kwargs(build_device))
 
 
 def _inputs_per_column_model(device: str):
@@ -185,10 +196,10 @@ def _inputs_per_column_model(device: str):
     return (h,), {}
 
 
-def _build_binary_memoryless_channel():
+def _build_binary_memoryless_channel(build_device: str | None):
     from sionna.phy.channel import BinaryMemorylessChannel
 
-    return BinaryMemorylessChannel()
+    return BinaryMemorylessChannel(**_device_kwargs(build_device))
 
 
 def _inputs_binary_memoryless_channel(device: str):
@@ -198,22 +209,22 @@ def _inputs_binary_memoryless_channel(device: str):
     return (x, pb), {}
 
 
-def _build_binary_symmetric_channel():
+def _build_binary_symmetric_channel(build_device: str | None):
     from sionna.phy.channel import BinarySymmetricChannel
 
-    return BinarySymmetricChannel()
+    return BinarySymmetricChannel(**_device_kwargs(build_device))
 
 
-def _build_binary_erasure_channel():
+def _build_binary_erasure_channel(build_device: str | None):
     from sionna.phy.channel import BinaryErasureChannel
 
-    return BinaryErasureChannel()
+    return BinaryErasureChannel(**_device_kwargs(build_device))
 
 
-def _build_binary_z_channel():
+def _build_binary_z_channel(build_device: str | None):
     from sionna.phy.channel import BinaryZChannel
 
-    return BinaryZChannel()
+    return BinaryZChannel(**_device_kwargs(build_device))
 
 
 def _inputs_binary_channel(device: str):
@@ -223,10 +234,16 @@ def _inputs_binary_channel(device: str):
     return (x, pb), {}
 
 
-def _build_rayleigh_block_fading():
+def _build_rayleigh_block_fading(build_device: str | None):
     from sionna.phy.channel import RayleighBlockFading
 
-    return RayleighBlockFading(num_rx=1, num_rx_ant=2, num_tx=1, num_tx_ant=2)
+    return RayleighBlockFading(
+        num_rx=1,
+        num_rx_ant=2,
+        num_tx=1,
+        num_tx_ant=2,
+        **_device_kwargs(build_device),
+    )
 
 
 def _inputs_rayleigh_block_fading(device: str):
@@ -234,10 +251,10 @@ def _inputs_rayleigh_block_fading(device: str):
     return (2, 4), {}
 
 
-def _build_edfa():
+def _build_edfa(build_device: str | None):
     from sionna.phy.channel import EDFA
 
-    return EDFA(g=4.0, f=2.0, dt=1.0e-12)
+    return EDFA(g=4.0, f=2.0, dt=1.0e-12, **_device_kwargs(build_device))
 
 
 def _inputs_edfa(device: str):
@@ -246,7 +263,7 @@ def _inputs_edfa(device: str):
     return (x,), {}
 
 
-def _build_ssfm():
+def _build_ssfm(build_device: str | None):
     from sionna.phy.channel import SSFM
 
     return SSFM(
@@ -256,6 +273,7 @@ def _build_ssfm():
         with_attenuation=True,
         with_dispersion=False,
         with_nonlinearity=False,
+        **_device_kwargs(build_device),
     )
 
 

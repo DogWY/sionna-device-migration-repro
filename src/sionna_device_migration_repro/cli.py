@@ -41,6 +41,14 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="Run one or more repro cases.")
     run_parser.add_argument("--device", default="cuda:0", help="Target device, e.g. cuda:0.")
     run_parser.add_argument(
+        "--build-device",
+        default="cpu",
+        help=(
+            "Device used when constructing repro objects before calling .to(device). "
+            "Use 'default' to keep Sionna's global default device."
+        ),
+    )
+    run_parser.add_argument(
         "--case",
         default="all",
         help="Case name to run, or 'all'. Use list-cases to inspect available cases.",
@@ -95,11 +103,18 @@ def _cmd_run(args: argparse.Namespace) -> int:
         raise
 
     device = args.device
+    build_device = None if args.build_device == "default" else args.build_device
     try:
         validate_device_available(device)
     except RuntimeError as exc:
         print(f"Device validation failed: {exc}")
         return 2
+    if build_device is not None:
+        try:
+            validate_device_available(build_device)
+        except RuntimeError as exc:
+            print(f"Build-device validation failed: {exc}")
+            return 2
 
     if args.case == "all":
         if args.category:
@@ -126,6 +141,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         run_case(
             case,
             device=device,
+            build_device=build_device,
             probe_forward=not args.no_probe_forward,
             include_private=not args.public_only,
             max_depth=args.max_depth,
@@ -133,17 +149,17 @@ def _cmd_run(args: argparse.Namespace) -> int:
         for case in cases
     ]
 
-    _print_device_results(device, results)
+    _print_device_results(device, args.build_device, results)
 
     if args.json_report:
-        _write_json_report(args.json_report, device, results)
+        _write_json_report(args.json_report, device, args.build_device, results)
 
     has_failure = any(result.failed for result in results)
     return 1 if has_failure and not args.no_fail else 0
 
 
-def _print_device_results(device: str, results: Sequence[Any]) -> None:
-    print(f"\n# Device {device}")
+def _print_device_results(device: str, build_device: str, results: Sequence[Any]) -> None:
+    print(f"\n# Build device {build_device} -> target device {device}")
     _print_results(results)
 
 
@@ -168,9 +184,15 @@ def _print_results(results: Sequence[Any]) -> None:
             print(format_issues(result.forward_issues))
 
 
-def _write_json_report(path: Path, device: str, results: Sequence[Any]) -> None:
+def _write_json_report(
+    path: Path,
+    device: str,
+    build_device: str,
+    results: Sequence[Any],
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
+        "build_device": build_device,
         "device": device,
         "env": collect_env(),
         "results": [result.to_dict() for result in results],

@@ -20,10 +20,10 @@ class AWGNChannel(nn.Module):
     complex values, passed through Sionna's `AWGN`, then converted back.
     """
 
-    def __init__(self, snr: float | None = None):
+    def __init__(self, snr: float | None = None, device: str | None = None):
         super().__init__()
         self.snr = snr
-        self.awgn = AWGN()
+        self.awgn = AWGN(device=device)
 
     def forward(self, inputs: torch.Tensor, snr: float | None = None) -> torch.Tensor:
         if snr is None and self.snr is None:
