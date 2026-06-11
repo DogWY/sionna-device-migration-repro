@@ -216,7 +216,7 @@ Produce artifacts that can be shared with maintainers or collaborators:
 ## Implementation checklist
 
 - [x] Add `tools/inspect_phy_inventory.py`.
-- [ ] Generate `reports/phy-inventory.json` on the Ubuntu CUDA server.
+- [x] Generate `reports/phy-inventory.json` on the Ubuntu CUDA server.
 - [x] Add category support for `phy` once non-channel PHY cases are included.
 - [x] Expand dynamic cases beyond `sionna.phy.channel` for
   `sionna.phy.mapping` and `sionna.phy.signal`.
@@ -292,6 +292,8 @@ Implemented already:
 - CUDA forward-probe evidence for the current 126-case umbrella `phy` dynamic
   case set.
 - issue-ready upstream repro note.
+- Ubuntu CUDA server environment dump and `reports/phy-inventory.json`
+  inventory artifact.
 
 Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
@@ -304,8 +306,6 @@ Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
 Not implemented yet:
 
-- server-side `reports/phy-inventory.json`, if a machine-local inventory
-  artifact is needed for attachment.
 - upstream issue posting.
 
 ## Recommended next step

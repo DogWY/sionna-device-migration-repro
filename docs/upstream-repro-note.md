@@ -40,17 +40,39 @@ recursively audits device state, and optionally runs small forward probes.
 
 ## Environment used for collected evidence
 
-- OS/runtime: Ubuntu server with multiple NVIDIA GPUs.
+- OS/runtime: Ubuntu server, Linux `5.4.0-81-generic`, x86_64.
+- GPU topology visible to PyTorch: 4 x NVIDIA GeForce RTX 4090.
+- CUDA visibility environment: `CUDA_VISIBLE_DEVICES` unset,
+  `NVIDIA_VISIBLE_DEVICES` unset.
 - Conda environment: `sdm`.
+- Python: `3.12.13`.
+- Sionna: `2.0.1`.
+- Sionna RT: `2.0.1`.
+- PyTorch: `2.11.0+cu128`.
+- PyTorch CUDA runtime: `12.8`.
 - Target CUDA device used in the reports: `cuda:1`.
 - Construction device used in the controlled sweeps: `cpu`.
-- Sionna version used for local inventory smoke: `2.0.1`.
 
 For a full version dump on the CUDA machine, run:
 
 ```bash
 python run_repro.py env
 ```
+
+The `sionna.phy` inventory was also generated on the same server:
+
+```bash
+python tools/inspect_phy_inventory.py --json-report reports/phy-inventory.json
+```
+
+Inventory summary:
+
+- Classes under `sionna.phy`: 176.
+- Import errors: 0.
+- Risk counts: P0 = 157, P1 = 2, P2 = 17.
+- P0 classes by area: `channel` = 40, `ofdm` = 36, `fec` = 30,
+  `mapping` = 14, `signal` = 12, `nr` = 12, `mimo` = 8, `utils` = 3,
+  plus core `Object` and `Block`.
 
 ## Minimal AWGN object-state repro
 

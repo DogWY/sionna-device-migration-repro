@@ -82,6 +82,10 @@ The final target environment is an Ubuntu server with multiple NVIDIA GPUs.
 Device-selection behavior, CUDA validation, and repro reports should therefore
 be designed for multi-GPU CUDA systems, not only for a single local GPU.
 
+The collected CUDA evidence was produced on an Ubuntu server with four visible
+NVIDIA GeForce RTX 4090 GPUs, Sionna 2.0.1, PyTorch 2.11.0+cu128, and Python
+3.12.13 in the `sdm` environment.
+
 ## Audit plan
 
 The detailed plan for auditing all relevant `sionna.phy` objects is maintained

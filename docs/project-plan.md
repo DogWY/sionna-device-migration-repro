@@ -53,7 +53,8 @@ across the current 126-case dynamic set failed 125 cases, passed only
 `fec-trellis`, and had no skips. The latest umbrella PHY forward-probe sweep
 found 18 forward exceptions and 30 cases with wrong-device forward outputs,
 covering 33 returned tensors. The upstream-facing repro note is now drafted
-from the audit-only and forward-probe CUDA evidence.
+from the audit-only and forward-probe CUDA evidence. Server-side environment
+and inventory evidence has also been captured on the Ubuntu multi-GPU system.
 
 ## Phase 3: upstream report material
 
