@@ -9,16 +9,18 @@ and the broader plan in [`phy-audit-plan.md`](phy-audit-plan.md).
 
 The important point is that the stale-device pattern is not limited to channel
 objects. All currently implemented mapping and signal cases show device
-migration issues after a normal PyTorch `.to(cuda:1)` call.
+migration issues after CPU construction followed by a normal PyTorch
+`.to(cuda_device)` call.
 
 ## Commands
 
-Both sweeps constructed objects on CPU before calling `.to(cuda:1)` and disabled
+Both sweeps constructed objects on CPU before calling `.to(device)` and disabled
 forward probes so that the reports focus on post-migration object state:
 
 ```bash
-python run_repro.py run --category mapping --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mapping-audit-cuda1.json
-python run_repro.py run --category signal --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/signal-audit-cuda1.json
+CUDA_DEVICE=cuda:0
+python run_repro.py run --category mapping --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/mapping-audit-cuda.json
+python run_repro.py run --category signal --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/signal-audit-cuda.json
 ```
 
 ## Sweep summary
@@ -26,8 +28,7 @@ python run_repro.py run --category signal --device cuda:1 --build-device cpu --n
 Environment:
 
 - Runtime: Ubuntu server with NVIDIA CUDA GPUs.
-- Sionna environment: `sdm`.
-- Target device: `cuda:1`.
+- Target device in collected reports: `cuda:1`.
 - Build device: `cpu`.
 - Forward probes: disabled.
 
@@ -39,7 +40,7 @@ Result:
 - Failed signal audit cases: 12.
 - All mapping and signal cases include stale Sionna logical device state.
 - Many mapping and signal cases also include ordinary tensor attributes that
-  remain on CPU after `.to(cuda:1)`.
+  remain on CPU after `.to(device)`.
 
 ## Mapping case-level findings
 
@@ -119,31 +120,14 @@ attributes.
 The clean mapping and signal sweeps are strong evidence that the `.to(device)`
 migration problem is systematic across multiple `sionna.phy` areas:
 
-- `sionna.phy.channel`: 17/17 current cases failed audit.
-- `sionna.phy.mapping`: 14/14 current cases failed audit.
-- `sionna.phy.signal`: 12/12 current cases failed audit.
+- `sionna.phy.channel`: 17/17 cases failed audit.
+- `sionna.phy.mapping`: 14/14 cases failed audit.
+- `sionna.phy.signal`: 12/12 cases failed audit.
 
 The issue is therefore broader than the original wrapped `AWGN` failure.
 
-## Next step
+## Related evidence
 
-The umbrella PHY audit report has now also been collected. See
-[`phy-audit-findings.md`](phy-audit-findings.md).
-
-Standalone `sionna.phy.ofdm` dynamic cases have now been added and audited. The
-clean OFDM sweep found 33/33 OFDM-category cases failed and 0 skipped. The
-updated umbrella PHY sweep also found 75/75 current cases failed and 0 skipped.
-Standalone `sionna.phy.mimo` cases have now been added and audited. The MIMO
-sweep found 8/8 failed cases and 0 skipped. The updated umbrella PHY sweep
-after the MIMO expansion found 83/83 then-current cases failed and 0 skipped.
-See
-[`mimo-audit-findings.md`](mimo-audit-findings.md) and
-[`phy-audit-findings.md`](phy-audit-findings.md). Standalone
-`sionna.phy.fec` cases have now been added and audited. The FEC sweep found
-30/31 failed cases, one passed standalone Trellis case, and 0 skipped. See
-[`fec-audit-findings.md`](fec-audit-findings.md). The updated umbrella PHY
-sweep across all 114 then-current dynamic cases found 113 failed cases, one passed
-standalone Trellis case, and 0 skipped. Standalone NR dynamic cases have now
-been added and audited: 12/12 failed and 0 skipped. The updated umbrella PHY
-sweep across all 126 current dynamic cases found 125 failed cases, one passed
-standalone Trellis case, and 0 skipped.
+The umbrella PHY audit and forward-probe summaries are in
+[`phy-audit-findings.md`](phy-audit-findings.md) and
+[`forward-probe-findings.md`](forward-probe-findings.md).

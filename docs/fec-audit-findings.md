@@ -11,20 +11,18 @@ already seen in channel, mapping, signal, MIMO, and OFDM objects.
 The focused sweep used:
 
 ```bash
-python run_repro.py run --category fec --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/fec-audit-cuda1.json
+CUDA_DEVICE=cuda:0
+python run_repro.py run --category fec --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/fec-audit-cuda.json
 ```
 
-The command wrote `reports/fec-audit-cuda1.json`. Because failed audit cases
-return a non-zero process status by default, commands chained with `&&` after
-this sweep will not run unless `--no-fail` is also passed.
+The collected report used `cuda:1`; any visible CUDA device can be used.
 
 ## Sweep summary
 
 Environment:
 
 - Runtime: Ubuntu server with NVIDIA CUDA GPUs.
-- Sionna environment: `sdm`.
-- Target device: `cuda:1`.
+- Target device in collected report: `cuda:1`.
 - Build device: `cpu`.
 - Forward probes: disabled.
 
@@ -36,7 +34,7 @@ Result:
 - Skipped cases: 0.
 - The only passed case was standalone `fec-trellis`.
 - All Sionna `Block` or `Object` FEC cases include stale Sionna logical device
-  state after `.to(cuda:1)`.
+  state after `.to(device)`.
 
 ## Case-level findings
 
@@ -45,7 +43,7 @@ Result:
 | `fec-gaussian-prior-source` | failed | 1 | `root._device_str` remains `cpu` |
 | `fec-crc-encoder` | failed | 1 | `root._device_str` remains `cpu` |
 | `fec-crc-decoder` | failed | 2 | decoder and nested CRC encoder logical devices remain `cpu` |
-| `fec-trellis` | passed | 0 | standalone Trellis `.to(cuda:1)` migrates its explicit tensor state |
+| `fec-trellis` | passed | 0 | standalone Trellis `.to(device)` migrates its explicit tensor state |
 | `fec-conv-encoder` | failed | 7 | encoder logical device and nested Trellis tensors remain `cpu` |
 | `fec-viterbi-decoder` | failed | 7 | decoder logical device and nested Trellis tensors remain `cpu` |
 | `fec-bcjr-decoder` | failed | 7 | decoder logical device and nested Trellis tensors remain `cpu` |
@@ -111,21 +109,18 @@ Sionna-specific logical device fields or ordinary tensor attributes.
 ## Trellis note
 
 The standalone `Trellis` case passed the audit. This is useful boundary
-evidence: `Trellis.to(cuda:1)` can migrate its explicit tensor state when called
+evidence: `Trellis.to(device)` can migrate its explicit tensor state when called
 directly. However, FEC blocks that own a Trellis still failed because their
 parent Sionna logical device state and nested ordinary tensor attributes remain
-on CPU after parent `.to(cuda:1)`.
+on CPU after parent `.to(device)`.
 
 ## Interpretation
 
 The focused FEC sweep confirms that `.to(device)` migration issues are also
-systematic across standalone `sionna.phy.fec` blocks. The updated umbrella PHY
-sweep across all 114 then-current dynamic cases found 113 failed cases, one passed
-standalone Trellis case, and 0 skipped. Standalone NR dynamic cases have now
-been added and audited: 12/12 failed and 0 skipped. The updated umbrella PHY
-sweep across all 126 current dynamic cases found 125 failed cases, one passed
-standalone Trellis case, and 0 skipped.
+systematic across standalone `sionna.phy.fec` blocks. The current umbrella PHY
+sweep covers 126 dynamic cases and found 125 failed audit cases, one passed
+standalone `fec-trellis` boundary case, and zero skipped cases.
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda.json
 ```

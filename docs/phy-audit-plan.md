@@ -1,15 +1,15 @@
-# Sionna PHY device migration audit plan
+# Sionna PHY device migration audit methodology
 
 ## Objective
 
 Audit `sionna.phy` for PyTorch `.to(device)` migration problems. The concrete
-bug already observed is that a user-defined wrapper moved to `cuda:1` still
-contains an internal Sionna `AWGN` block whose logical device state remains
-`cuda:0`.
+bug is that a Sionna PHY object can be constructed on CPU, moved with
+`.to(cuda_device)`, and still keep logical device state or ordinary tensor
+attributes on CPU.
 
-This project should determine whether that behavior is isolated to `AWGN` and
-channel wrappers, or whether it is a broader pattern across stateful objects in
-`sionna.phy`.
+The original symptom was a user-defined PyTorch wrapper containing
+`sionna.phy.channel.AWGN`. The broader audit checks whether the same pattern is
+systematic across `sionna.phy`.
 
 ## Scope
 
@@ -28,291 +28,132 @@ In scope:
 
 Out of scope:
 
-- `sionna.rt` and all RT-specific functionality.
+- `sionna.rt` and RT-specific functionality.
 - Pure functions unless they are needed to build a minimal repro case.
 - Rewriting or patching Sionna source code.
-- Benchmarking performance or numerical accuracy.
+- Performance or numerical-accuracy benchmarking.
 
-## Key hypothesis
+## Hypothesis
 
 PyTorch's default `nn.Module.to(device)` migrates parameters and registered
-buffers, and it recursively visits child modules. It does not know how to update
-Sionna's separate logical device state such as `_device_str`.
+buffers, and it recursively visits child modules. It does not automatically
+update library-specific device metadata such as Sionna's `_device_str`.
 
-If a Sionna PHY object later creates tensors from `self.device`, those tensors
-may be created on the stale logical device instead of the requested target
-device. This can produce:
+If a Sionna PHY object later creates tensors from stale `self.device`, or keeps
+ordinary tensor attributes that are not registered buffers, `.to(device)` can
+leave part of the object graph on the construction device. This can produce:
 
-- audit-only mismatches, such as `expected=cuda:1, actual=cuda:0`;
+- audit-only mismatches, such as `expected=cuda:x, actual=cpu`;
 - mixed-device forward failures;
-- output tensors on the wrong device;
-- failures only when the target device differs from Sionna's default or global
-  config device.
-
-## Evidence already captured
-
-The user-side wrapper `AWGNChannel` was moved with:
-
-```bash
-python run_repro.py run --case wrapped-awgn-channel --device cuda:1
-```
-
-Observed audit issue:
-
-```text
-root.awgn._device_str: expected=cuda:1, actual=cuda:0
-```
-
-This is enough to justify a broader `sionna.phy` audit. Further work should not
-focus on comparing different GPU indices. It should focus on which PHY classes
-exhibit the same stale logical device pattern.
-
-The first Ubuntu channel sweep also showed that some cases failed during object
-construction with CUDA out-of-memory errors because Sionna's global default
-device was `cuda:0`. The repro runner now defaults to constructing cases on
-CPU before calling `.to(target_device)`. Use `--build-device default` only when
-the goal is to reproduce Sionna's global default construction behavior.
-
-A clean channel sweep with `--build-device cpu` found stale device state in all
-17 implemented channel cases. See
-[`docs/channel-audit-findings.md`](channel-audit-findings.md) for the case-level
-summary.
-
-Clean mapping and signal sweeps with `--build-device cpu` found stale device
-state in all 26 implemented non-channel cases. See
-[`docs/mapping-signal-audit-findings.md`](mapping-signal-audit-findings.md) for
-the case-level summary.
-
-The first umbrella PHY sweep before standalone OFDM expansion found stale
-device state across all 43 dynamic cases. The latest collected umbrella PHY
-sweep after standalone NR expansion found stale device state across 125 of 126
-dynamic cases, with only the standalone `fec-trellis` case passing.
-See [`docs/phy-audit-findings.md`](phy-audit-findings.md) for the current
-PHY-level summary.
-
-The clean standalone OFDM sweep found stale device state in all 33
-OFDM-category cases. See
-[`docs/ofdm-audit-findings.md`](ofdm-audit-findings.md).
-
-The clean standalone MIMO sweep found stale device state in all 8 MIMO-category
-cases. See [`docs/mimo-audit-findings.md`](mimo-audit-findings.md).
-
-The clean standalone FEC sweep found stale device state in 30/31 FEC-category
-cases. The standalone `fec-trellis` case passed. See
-[`docs/fec-audit-findings.md`](fec-audit-findings.md).
-
-The clean standalone NR sweep found stale device state in all 12 NR-category
-cases. See [`docs/nr-audit-findings.md`](nr-audit-findings.md).
-
-The current umbrella PHY forward-probe sweep kept safe minimal inputs enabled
-for the same 126-case dynamic set. It found 18 forward exceptions and 30 cases
-that completed forward execution but returned 33 tensors on CPU instead of
-`cuda:1`. See
-[`docs/forward-probe-findings.md`](forward-probe-findings.md).
+- output tensors on CPU for CUDA inputs;
+- stale state inside child modules even after a parent PyTorch wrapper is moved.
 
 ## Audit workflow
 
-### Phase 1: inventory `sionna.phy`
+### 1. Inventory `sionna.phy`
 
-Build an inventory script that imports and scans `sionna.phy` recursively.
-
-Proposed command:
+Generate a static class inventory:
 
 ```bash
 python tools/inspect_phy_inventory.py --json-report reports/phy-inventory.json
 ```
 
-For each discovered class, record:
+For each discovered class, record module path, class name, base classes,
+constructor signature, device-related fields, buffer usage, tensor attributes,
+and whether the class is directly instantiable.
 
-- module name;
-- class name;
-- source file path;
-- base classes;
-- constructor signature;
-- whether it is a `torch.nn.Module`;
-- whether it inherits Sionna `Object` or `Block`;
-- whether the constructor accepts `device`;
-- whether source text contains `_device_str`;
-- whether source text contains `register_buffer`;
-- whether source text contains `self.device`;
-- whether source text contains `torch.tensor`, `torch.zeros`, `torch.ones`,
-  random tensor factories, or tensor conversions using `device=`;
-- whether the class is abstract or directly instantiable.
+### 2. Classify risk
 
-### Phase 2: risk classification
+Use the inventory to identify dynamic repro candidates:
 
-Classify inventory entries into priority levels:
+- P0: stateful PHY objects with Sionna logical device state, child modules,
+  registered buffers, ordinary tensor attributes, or tensor creation through
+  `self.device`.
+- P1: relevant objects that require complex domain-specific forward inputs.
+- P2: abstract classes, pure configuration/data holders, or classes without
+  device state or tensor creation.
 
-- P0: must test dynamically.
-  Stateful PHY objects with Sionna logical device state, child modules,
-  registered buffers, or tensor creation through `self.device`.
-- P1: audit-only first.
-  Objects that are likely relevant but require complex domain-specific inputs
-  for forward execution.
-- P2: static inspection only.
-  Abstract classes, pure configuration/data holders, or classes without device
-  state or tensor creation.
-- Excluded: RT-only objects and non-PHY objects.
+High-risk areas are `channel`, `mapping`, `signal`, `mimo`, `ofdm`, `fec`, and
+`nr`.
 
-Expected high-risk areas:
+### 3. Run dynamic repro cases
 
-- `sionna.phy.channel`
-- `sionna.phy.ofdm`
-- `sionna.phy.mimo`
-- `sionna.phy.mapping`
-- `sionna.phy.signal`
-- `sionna.phy.fec`
-- `sionna.phy.nr`
-
-### Phase 3: generate minimal dynamic repro cases
-
-For P0 classes, add minimal cases to the existing `run_repro.py` workflow.
-
-Initial command for clean state migration evidence:
+Choose any visible CUDA device:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
+CUDA_DEVICE=cuda:0
 ```
 
-Then run forward probes only for objects with small, reliable inputs:
+Run the object-state audit:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda.json
 ```
 
-Dynamic cases should:
+Run the forward-probe sweep:
+
+```bash
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-fail --json-report reports/phy-forward-cuda.json
+```
+
+Each dynamic case should:
 
 - construct the object on a controlled build device, CPU by default;
 - call `.to(target_device)` through PyTorch;
 - audit registered tensors, ordinary tensors, child modules, and logical device
   fields;
-- optionally run one forward/call probe using small inputs already placed on
+- optionally run one forward or call probe using small inputs already placed on
   `target_device`;
 - emit JSON records that distinguish object-state issues, forward exceptions,
   and output-device mismatches.
 
-### Phase 4: failure taxonomy
+## Current evidence
 
-Group failures by cause:
+Collected audit-only CUDA evidence:
 
-- stale logical device state, e.g. `_device_str` remains on another device;
-- child module stale state after parent `.to()`;
-- registered buffers migrated but derived ordinary tensor state did not;
-- forward creates new tensors on stale `self.device`;
-- output is on the wrong device without an exception;
-- forward fails because operands are on different devices.
+- Total dynamic PHY cases: 126.
+- Failed audit cases: 125.
+- Passed audit cases: 1.
+- Skipped cases: 0.
+- Only passed case: standalone `fec-trellis`.
 
-### Phase 5: communication artifacts
+Category-level results:
 
-Produce artifacts that can be shared with maintainers or collaborators:
+| Area | Result |
+| --- | ---: |
+| `sionna.phy.channel` | 17/17 failed |
+| `sionna.phy.mapping` | 14/14 failed |
+| `sionna.phy.signal` | 12/12 failed |
+| `sionna.phy.mimo` | 8/8 failed |
+| `sionna.phy.ofdm` | 33/33 failed |
+| `sionna.phy.fec` | 30/31 failed |
+| `sionna.phy.nr` | 12/12 failed |
 
-- `reports/phy-inventory.json`
-- `reports/phy-audit-cuda1.json`
-- `reports/phy-forward-cuda1.json`
-- a concise summary table listing affected classes, issue paths, and failure
-  mode;
-- a minimal standalone snippet for the most representative failure.
+Collected forward-probe CUDA evidence:
 
-## Implementation checklist
+- Forward exceptions: 18 cases.
+- Wrong-device forward outputs: 30 cases.
+- Wrong-device returned tensors: 33 tensors.
 
-- [x] Add `tools/inspect_phy_inventory.py`.
-- [x] Generate `reports/phy-inventory.json` on the Ubuntu CUDA server.
-- [x] Add category support for `phy` once non-channel PHY cases are included.
-- [x] Expand dynamic cases beyond `sionna.phy.channel` for
-  `sionna.phy.mapping` and `sionna.phy.signal`.
-- [x] Keep `channel` cases as a subset category for focused reruns.
-- [x] Run audit-only channel sweep on the CUDA server.
-- [x] Run audit-only PHY sweep on the CUDA server.
-- [x] Run audit-only mapping and signal sweeps on the CUDA server.
-- [x] Add standalone `sionna.phy.ofdm` dynamic cases.
-- [x] Run first audit-only OFDM sweep on the CUDA server.
-- [x] Add construction-time Sionna `config.device` guard for `--build-device`.
-- [x] Rerun audit-only OFDM sweep after the construction-device fix.
-- [x] Run updated umbrella PHY sweep after the standalone OFDM expansion.
-- [x] Add standalone `sionna.phy.mimo` dynamic cases.
-- [x] Run audit-only MIMO sweep on the CUDA server.
-- [x] Rerun umbrella PHY sweep after the standalone MIMO expansion.
-- [x] Add standalone `sionna.phy.fec` dynamic cases.
-- [x] Run audit-only FEC sweep on the CUDA server.
-- [x] Rerun umbrella PHY sweep after the standalone FEC expansion.
-- [x] Add standalone `sionna.phy.nr` dynamic cases.
-- [x] Run CPU smoke validation for standalone NR cases.
-- [x] Run audit-only NR sweep on the CUDA server.
-- [x] Rerun umbrella PHY sweep after the standalone NR expansion.
-- [x] Run forward PHY sweep for safe cases.
-- [x] Summarize affected classes and failure modes for the current dynamic case
-  set.
-- [x] Prepare a short upstream-facing repro note.
+## Failure taxonomy
 
-## Current repository status
+- Stale logical device state, for example `_device_str` remains `cpu` after
+  `.to("cuda:x")`.
+- Stale child module state after parent `.to(device)`.
+- Ordinary tensor attributes not migrated because they are not registered
+  buffers or parameters.
+- Forward-created tensors using stale `self.device`.
+- Forward execution succeeds but returns tensors on the wrong device.
+- Forward execution fails because operands are split across CPU and CUDA.
 
-Implemented already:
+## Related documents
 
-- repository-local entrypoint: `python run_repro.py`;
-- static PHY inventory script: `tools/inspect_phy_inventory.py`;
-- recursive device audit helper;
-- JSON report output;
-- `channel` category with multiple `sionna.phy.channel` cases;
-- `mapping` category with source, constellation, mapper, demapper, logits, and
-  symbol-index conversion cases;
-- `signal` category with resampling, window, and filter cases;
-- `fec` category with CRC, convolutional, interleaver, scrambler, linear block
-  code, LDPC, polar, turbo, callback, and Gaussian-prior helper cases;
-- `nr` category with layer mapping, TB encoder/decoder, PUSCH pilot, precoder,
-  transmitter, LS estimator, receiver, and NR utility helper cases;
-- `mimo` category with stream management, list-to-LLR helpers, and standalone
-  detector cases;
-- `ofdm` category with resource-grid, pilot, mapper/demapper, modem, channel
-  estimator, equalizer, detector, and precoding cases;
-- `phy` umbrella category across the current dynamic case set;
-- primary user wrapper repro: `wrapped-awgn-channel`;
-- CPU smoke validation for the current channel, mapping, signal, and PHY case
-  sets.
-- CPU smoke validation for the current OFDM case set.
-- CPU smoke validation for the current MIMO case set.
-- CPU smoke validation for the current FEC case set.
-- CPU smoke validation for the current NR case set.
-- CPU smoke validation for the current 126-case PHY set.
-- CUDA audit-only evidence for `channel`, `mapping`, and `signal` dynamic
-  cases.
-- CUDA audit-only evidence for the first umbrella `phy` dynamic case set before
-  standalone OFDM cases were added.
-- Clean CUDA audit-only evidence for standalone `ofdm` cases.
-- CUDA audit-only evidence for the current umbrella `phy` dynamic case set
-  after standalone OFDM cases were added.
-- Clean CUDA audit-only evidence for standalone `mimo` cases.
-- CUDA audit-only evidence for the current umbrella `phy` dynamic case set
-  after standalone MIMO cases were added.
-- Clean CUDA audit-only evidence for standalone `fec` cases.
-- CUDA audit-only evidence for the current umbrella `phy` dynamic case set
-  after standalone FEC cases were added.
-- Clean CUDA audit-only evidence for standalone `nr` cases.
-- CUDA audit-only evidence for the current umbrella `phy` dynamic case set
-  after standalone NR cases were added.
-- CUDA forward-probe evidence for the current 126-case umbrella `phy` dynamic
-  case set.
-- issue-ready upstream repro note.
-- Ubuntu CUDA server environment dump and `reports/phy-inventory.json`
-  inventory artifact.
-
-Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
-
-- total classes under `sionna.phy`: 176;
-- import errors: 0;
-- risk counts: P0 = 157, P1 = 2, P2 = 17;
-- P0 classes by area: `channel` = 40, `ofdm` = 36, `fec` = 30,
-  `mapping` = 14, `signal` = 12, `nr` = 12, `mimo` = 8, `utils` = 3,
-  plus core `Object`/`Block`.
-
-Not implemented yet:
-
-- upstream issue posting.
-
-## Recommended next step
-
-Post the upstream-facing repro note or attach it to a maintainer discussion.
-The latest forward-probe report can be regenerated with:
-
-```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
-```
+- [`upstream-repro-note.md`](upstream-repro-note.md)
+- [`phy-audit-findings.md`](phy-audit-findings.md)
+- [`forward-probe-findings.md`](forward-probe-findings.md)
+- [`channel-audit-findings.md`](channel-audit-findings.md)
+- [`mapping-signal-audit-findings.md`](mapping-signal-audit-findings.md)
+- [`ofdm-audit-findings.md`](ofdm-audit-findings.md)
+- [`mimo-audit-findings.md`](mimo-audit-findings.md)
+- [`fec-audit-findings.md`](fec-audit-findings.md)
+- [`nr-audit-findings.md`](nr-audit-findings.md)

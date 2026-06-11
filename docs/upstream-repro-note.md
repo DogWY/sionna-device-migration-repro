@@ -2,88 +2,44 @@
 
 ## Suggested title
 
-`sionna.phy` PyTorch modules do not consistently migrate logical device and
-ordinary tensor state with `.to(device)`
+`sionna.phy` modules do not consistently migrate logical device and ordinary
+tensor state with `.to(device)`
 
 ## Summary
 
-Sionna PHY objects are PyTorch modules, but several of them keep device-related
-state outside PyTorch parameters and registered buffers. After constructing a
-PHY object on CPU and then calling the normal PyTorch `.to("cuda:1")`, internal
-Sionna logical device fields such as `_device_str` can remain on CPU. Ordinary
-tensor attributes can also remain on CPU.
+Some `sionna.phy` objects appear to keep Sionna-specific logical device state
+and ordinary tensor attributes outside PyTorch's normal parameter and buffer
+migration path.
 
-This leads to three user-visible outcomes:
-
-- post-migration object state still reports `cpu` instead of the requested CUDA
-  device;
-- forward execution returns tensors on CPU even though the input tensors and
-  target module device are CUDA;
-- forward execution raises mixed-device errors when stale CPU state is used
-  together with CUDA inputs.
+After constructing an object on CPU and then calling `.to(cuda_device)`, fields
+such as `_device_str` can remain on CPU. In forward probes, this can either
+return CPU tensors for CUDA inputs or raise mixed CPU/CUDA runtime errors.
 
 The issue was first observed in a user-defined `torch.nn.Module` wrapper around
-`sionna.phy.channel.AWGN`, but a broader sweep shows the same pattern across
-many `sionna.phy` areas.
+`sionna.phy.channel.AWGN`. A broader sweep of dynamic `sionna.phy` cases shows
+the same pattern across channel, mapping, signal, MIMO, OFDM, FEC, and NR
+objects.
 
 ## Reproduction repository
-
-Repository:
 
 ```text
 https://github.com/DogWY/sionna-device-migration-repro
 ```
 
 The repository does not patch Sionna and does not reimplement communication
-models. It only constructs small Sionna PHY objects, calls PyTorch `.to(device)`,
+models. It constructs small Sionna PHY objects, calls PyTorch `.to(device)`,
 recursively audits device state, and optionally runs small forward probes.
 
-## Environment used for collected evidence
+## Minimal AWGN repro
 
-- OS/runtime: Ubuntu server, Linux `5.4.0-81-generic`, x86_64.
-- GPU topology visible to PyTorch: 4 x NVIDIA GeForce RTX 4090.
-- CUDA visibility environment: `CUDA_VISIBLE_DEVICES` unset,
-  `NVIDIA_VISIBLE_DEVICES` unset.
-- Conda environment: `sdm`.
-- Python: `3.12.13`.
-- Sionna: `2.0.1`.
-- Sionna RT: `2.0.1`.
-- PyTorch: `2.11.0+cu128`.
-- PyTorch CUDA runtime: `12.8`.
-- Target CUDA device used in the reports: `cuda:1`.
-- Construction device used in the controlled sweeps: `cpu`.
-
-For a full version dump on the CUDA machine, run:
+Run on any visible CUDA device:
 
 ```bash
-python run_repro.py env
+CUDA_DEVICE=cuda:0
+python run_repro.py run --case awgn --device "$CUDA_DEVICE" --build-device cpu --no-fail
 ```
 
-The `sionna.phy` inventory was also generated on the same server:
-
-```bash
-python tools/inspect_phy_inventory.py --json-report reports/phy-inventory.json
-```
-
-Inventory summary:
-
-- Classes under `sionna.phy`: 176.
-- Import errors: 0.
-- Risk counts: P0 = 157, P1 = 2, P2 = 17.
-- P0 classes by area: `channel` = 40, `ofdm` = 36, `fec` = 30,
-  `mapping` = 14, `signal` = 12, `nr` = 12, `mimo` = 8, `utils` = 3,
-  plus core `Object` and `Block`.
-
-## Minimal AWGN object-state repro
-
-From a fresh checkout with Sionna installed:
-
-```bash
-conda activate sdm
-python run_repro.py run --case awgn --device cuda:1 --build-device cpu --no-fail
-```
-
-Observed result:
+Observed result from the collected `cuda:1` run:
 
 ```text
 == awgn [failed] ==
@@ -97,20 +53,20 @@ Found 1 device migration issue(s):
 
 Expected behavior:
 
-- After `awgn.to("cuda:1")`, the object should use `cuda:1` as its logical
-  device.
-- If the forward input is on `cuda:1`, the forward output should also be on
-  `cuda:1`.
+- After `awgn.to("cuda:x")`, the object should use the selected CUDA device as
+  its logical device.
+- If the forward input is on `cuda:x`, the forward output should also be on
+  that selected CUDA device.
 
 Actual behavior:
 
-- The logical Sionna device remains `cpu`.
+- `root._device_str` remains `cpu`.
 - The forward output is returned on CPU.
 
 ## User-style wrapper repro
 
-The original user pattern is a normal PyTorch wrapper that owns a Sionna AWGN
-child module:
+The same pattern appears when `AWGN` is used as a child module inside a normal
+PyTorch wrapper:
 
 ```python
 import torch
@@ -147,18 +103,20 @@ class AWGNChannel(nn.Module):
 
 
 channel = AWGNChannel(snr=10)
-channel.to("cuda:1")
-x = torch.randn(2, 4, 8, device="cuda:1")
+device = "cuda:0"  # choose any visible CUDA device
+channel.to(device)
+x = torch.randn(2, 4, 8, device=device)
 y = channel(x)
 ```
 
-In the repro repository, this wrapper is available as:
+Repository command:
 
 ```bash
-python run_repro.py run --case wrapped-awgn-channel --device cuda:1 --build-device cpu --no-fail
+python run_repro.py run --case wrapped-awgn-channel --device "$CUDA_DEVICE" --build-device cpu --no-fail
 ```
 
-The controlled audit reports the stale nested child state:
+The controlled audit from the collected `cuda:1` run reports stale nested child
+state:
 
 ```text
 root.awgn._device_str: expected=cuda:1, actual=cpu, kind=logical-device
@@ -169,23 +127,21 @@ also appear as `actual=cuda:0` while the wrapper is moved to `cuda:1`. The key
 problem is not the specific source device. The key problem is that the child
 Sionna module's logical device is not synchronized by PyTorch `.to(target)`.
 
-## Full PHY audit commands
+## Broader PHY sweep
 
-Object-state audit across the current 126-case dynamic PHY case set:
+Object-state audit across the current dynamic PHY case set:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda.json
 ```
 
 Forward-probe sweep across cases with safe minimal inputs:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-fail --json-report reports/phy-forward-cuda.json
 ```
 
-## Full PHY audit result summary
-
-The audit-only sweep found:
+Audit-only result:
 
 - Total dynamic PHY cases: 126.
 - Failed audit cases: 125.
@@ -205,13 +161,13 @@ Category-level results:
 | `sionna.phy.fec` | 30/31 failed |
 | `sionna.phy.nr` | 12/12 failed |
 
-The forward-probe sweep found:
+Forward-probe result:
 
 - Forward exceptions: 18 cases.
 - Wrong-device forward outputs: 30 cases.
 - Wrong-device returned tensors: 33 tensors.
 
-Representative forward failures include:
+Representative forward exceptions:
 
 | Case | Symptom |
 | --- | --- |
@@ -223,7 +179,7 @@ Representative forward failures include:
 | `ls-channel-estimator` | CPU index-select state used with CUDA input |
 | `lmmse-equalizer` | CPU index-select state used with CUDA input |
 
-Representative wrong-device outputs include:
+Representative wrong-device outputs:
 
 | Case | Wrong-device output |
 | --- | --- |
@@ -241,7 +197,7 @@ Representative wrong-device outputs include:
 The failures observed in the sweep fall into these categories:
 
 - stale Sionna logical device state, for example `_device_str` remains `cpu`
-  after `.to("cuda:1")`;
+  after `.to("cuda:x")`;
 - stale logical device state in child Sionna modules after a parent PyTorch
   wrapper is moved;
 - ordinary tensor attributes not migrated because they are not registered
@@ -250,6 +206,46 @@ The failures observed in the sweep fall into these categories:
 - successful forward execution with returned tensors on the wrong device;
 - runtime errors from operations that combine stale CPU tensors with CUDA
   inputs.
+
+## Environment used for collected evidence
+
+- OS/runtime: Ubuntu server, Linux `5.4.0-81-generic`, x86_64.
+- GPU topology visible to PyTorch: 4 x NVIDIA GeForce RTX 4090.
+- CUDA visibility environment: `CUDA_VISIBLE_DEVICES` unset,
+  `NVIDIA_VISIBLE_DEVICES` unset.
+- Python: `3.12.13`.
+- Sionna: `2.0.1`.
+- Sionna RT: `2.0.1`.
+- PyTorch: `2.11.0+cu128`.
+- PyTorch CUDA runtime: `12.8`.
+- Target CUDA device used in the collected reports: `cuda:1`.
+- Construction device used in the controlled sweeps: `cpu`.
+
+The `cuda:1` index is not required. It was used only because that GPU was idle
+on the test server. Readers can replace it with any visible CUDA device.
+
+For a full version dump on a repro machine, run:
+
+```bash
+python run_repro.py env
+```
+
+## Inventory summary
+
+The `sionna.phy` inventory was generated on the same server:
+
+```bash
+python tools/inspect_phy_inventory.py --json-report reports/phy-inventory.json
+```
+
+Inventory summary:
+
+- Classes under `sionna.phy`: 176.
+- Import errors: 0.
+- Risk counts: P0 = 157, P1 = 2, P2 = 17.
+- P0 classes by area: `channel` = 40, `ofdm` = 36, `fec` = 30,
+  `mapping` = 14, `signal` = 12, `nr` = 12, `mimo` = 8, `utils` = 3,
+  plus core `Object` and `Block`.
 
 ## Why this appears to be a `.to(device)` integration issue
 
@@ -266,9 +262,9 @@ on the requested target device after `.to(target)`.
 
 ## Expected maintainer-facing outcome
 
-The expected fix is not necessarily tied to this repro repository. Any upstream
-solution that makes Sionna PHY objects honor PyTorch module migration semantics
-would address the issue. Possible directions include:
+The expected fix is not tied to this repro repository. Any upstream solution
+that makes Sionna PHY objects honor PyTorch module migration semantics would
+address the issue. Possible directions include:
 
 - updating Sionna logical device state when `.to(device)` is called;
 - registering persistent tensor state as buffers where appropriate;

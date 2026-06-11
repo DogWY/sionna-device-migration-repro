@@ -11,16 +11,18 @@ seen in channel, mapping, signal, and OFDM objects.
 The focused sweep used:
 
 ```bash
-python run_repro.py run --category mimo --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/mimo-audit-cuda1.json
+CUDA_DEVICE=cuda:0
+python run_repro.py run --category mimo --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/mimo-audit-cuda.json
 ```
+
+The collected report used `cuda:1`; any visible CUDA device can be used.
 
 ## Sweep summary
 
 Environment:
 
 - Runtime: Ubuntu server with NVIDIA CUDA GPUs.
-- Sionna environment: `sdm`.
-- Target device: `cuda:1`.
+- Target device in collected report: `cuda:1`.
 - Build device: `cpu`.
 - Forward probes: disabled.
 
@@ -31,7 +33,7 @@ Result:
 - Skipped cases: 0.
 - All standalone MIMO cases include stale Sionna logical device state.
 - Detector and list-to-LLR helpers also keep ordinary tensor attributes on CPU
-  after `.to(cuda:1)`.
+  after `.to(device)`.
 
 ## Case-level findings
 
@@ -91,19 +93,15 @@ systematic across standalone `sionna.phy.mimo` objects. The issue is therefore
 not limited to channel wrappers, mapping utilities, signal filters, or OFDM
 wrappers.
 
-Combined audit-only CUDA evidence so far:
+Combined audit-only CUDA evidence:
 
-- `sionna.phy.channel`: 17/17 current cases failed audit.
-- `sionna.phy.mapping`: 14/14 current cases failed audit.
-- `sionna.phy.signal`: 12/12 current cases failed audit.
-- `sionna.phy.mimo`: 8/8 current cases failed audit.
+- `sionna.phy.channel`: 17/17 cases failed audit.
+- `sionna.phy.mapping`: 14/14 cases failed audit.
+- `sionna.phy.signal`: 12/12 cases failed audit.
+- `sionna.phy.mimo`: 8/8 cases failed audit.
 - `sionna.phy.ofdm`: 33/33 OFDM-category cases failed audit.
 
-The updated umbrella PHY sweep after the MIMO expansion found 83/83
-then-current dynamic cases failed and 0 skipped. Standalone FEC cases have now
-been added and audited: 30/31 failed, one standalone Trellis case passed, and
-0 skipped. The updated umbrella PHY sweep across all 114 then-current dynamic cases
-found 113 failed cases, one passed standalone Trellis case, and 0 skipped. The
-standalone NR dynamic cases have now been added and audited: 12/12 failed and
-0 skipped. The updated umbrella PHY sweep across all 126 current dynamic cases
-found 125 failed cases, one passed standalone Trellis case, and 0 skipped.
+The current umbrella PHY sweep covers 126 dynamic cases and found 125 failed
+audit cases, one passed standalone `fec-trellis` boundary case, and zero
+skipped cases. Runtime-impact evidence is summarized in
+[`forward-probe-findings.md`](forward-probe-findings.md).

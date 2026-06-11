@@ -7,21 +7,23 @@ dynamic PHY case set. Unlike the audit-only sweeps, this run kept forward
 probes enabled for cases that already have safe minimal inputs.
 
 The purpose is to show runtime impact after CPU construction followed by normal
-PyTorch `.to(cuda:1)`, not only stale object state.
+PyTorch `.to(cuda_device)`, not only stale object state.
 
 ## Command
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json
+CUDA_DEVICE=cuda:0
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-fail --json-report reports/phy-forward-cuda.json
 ```
+
+The collected report used `cuda:1`; any visible CUDA device can be used.
 
 ## Sweep summary
 
 Environment:
 
 - Runtime: Ubuntu server with NVIDIA CUDA GPUs.
-- Sionna environment: `sdm`.
-- Target device: `cuda:1`.
+- Target device in collected report: `cuda:1`.
 - Build device: `cpu`.
 - Forward probes: enabled where the case defines safe minimal inputs.
 
@@ -37,13 +39,14 @@ Result:
 
 ## Runtime failure categories
 
-### Forward exceptions from mixed devices
+### Forward exceptions
 
-The following cases raised runtime exceptions during forward execution:
+The broad run counted 18 forward errors. One was a server-side CUDA allocation
+failure in `wrapped-awgn-channel` during the broad sweep and is not used as
+device-migration evidence here. Representative device-related exceptions are:
 
 | Case | Error class | Main symptom |
 | --- | --- | --- |
-| `wrapped-awgn-channel` | `AcceleratorError` | CUDA out-of-memory on the server during the user-style wrapper probe; object audit still shows nested `AWGN` stale logical device state |
 | `apply-time` | `RuntimeError` | CPU index tensor used with CUDA input tensor |
 | `kronecker-flat-fading` | `RuntimeError` | matrix multiplication mixed CPU and CUDA tensors |
 | `binary-memoryless` | `RuntimeError` | CPU/CUDA tensor mix |
@@ -65,7 +68,7 @@ The following cases raised runtime exceptions during forward execution:
 ### Forward outputs left on CPU
 
 The following cases completed their forward probe but returned one or more CPU
-tensors when the target device was `cuda:1`:
+tensors when the target was a CUDA device:
 
 | Case | Wrong-device output tensors |
 | --- | ---: |
@@ -105,7 +108,7 @@ tensors when the target device was `cuda:1`:
 The forward sweep confirms that the stale object-state issues are not merely
 inspection artifacts:
 
-- Some blocks silently return tensors on CPU after `.to(cuda:1)`.
+- Some blocks silently return tensors on CPU after `.to(device)`.
 - Some blocks fail at runtime because stale CPU tensors are used with CUDA
   inputs.
 - Some composite cases only expose object-state issues because their forward

@@ -1,79 +1,92 @@
-# Project plan
+# Project scope
 
 ## Goal
 
-Build a narrow, reproducible, and extensible project that demonstrates how
-Sionna PHY objects, despite being `torch.nn.Module` instances, may fail to
-migrate all internal state when `.to("cuda:0")` is called directly.
+Build a narrow repro project for one upstream question:
+
+Does a `sionna.phy` object constructed on CPU behave like a normal PyTorch
+module after `.to(cuda_device)`?
+
+The repository should make the answer reproducible through small commands,
+machine-readable JSON reports, and concise evidence documents.
 
 ## Scope boundaries
 
 - Do not modify Sionna source code.
-- Do not implement communication channel algorithms in this repository.
-- Do not rely only on one object's error message; record both object-state
-  audits and forward-pass behavior.
+- Do not reimplement communication models.
+- Do not benchmark performance or numerical accuracy.
+- Do not rely on one error message only; collect both post-migration object
+  state and forward behavior.
 - Construct objects on CPU by default, then call `.to(target_device)`, because
-  that is the behavior PyTorch users naturally expect to work.
+  that is the PyTorch behavior users naturally expect to work.
 
-## Phase 1: minimal repro scaffold
+## Evidence to support the issue
 
-- Provide a CLI for listing cases, running cases, and collecting environment
-  information.
-- Include built-in Sionna PHY channel cases.
-- Print device audit results and forward probe results.
-- Write JSON reports for upstream issue reports.
+The project collects three kinds of evidence:
 
-## Phase 2: broader object coverage
+- Environment and inventory data: Python, PyTorch, Sionna, CUDA, GPU topology,
+  and a static inventory of `sionna.phy` classes.
+- Object-state audits: logical device fields, parameters, buffers, ordinary
+  tensor attributes, and child module state after `.to(device)`.
+- Forward probes: runtime exceptions and output tensor devices for CUDA inputs.
 
-Prioritize these object categories:
+## Current coverage
 
-- Objects with no internal tensors but with Sionna logical `device` state, such
-  as `AWGN`.
-- Composite objects with child blocks, such as `FlatFadingChannel`.
-- Objects with registered buffers, such as `KroneckerModel` and
-  `PerColumnModel`.
-- Mapping objects with lookup tensors, constellations, and child source or
-  mapper blocks.
-- Signal objects with generated or user-provided coefficient tensors.
-- Objects that generate or apply OFDM and time-domain channel behavior.
-- TR 38.901 objects, especially those with internal caches, topology state,
-  random state, or many tensor attributes.
+Dynamic cases currently cover these `sionna.phy` areas:
 
-Current dynamic coverage includes `sionna.phy.channel`,
-`sionna.phy.mapping`, `sionna.phy.signal`, standalone `sionna.phy.fec`,
-standalone `sionna.phy.nr`, standalone `sionna.phy.mimo`, and standalone
-`sionna.phy.ofdm` cases. The first 43 audit-only CUDA cases covering channel,
-mapping, and signal all failed after CPU construction followed by
-`.to(cuda:1)`. The clean OFDM CUDA audit found 33 failed OFDM-category cases
-and no skips. The clean MIMO CUDA audit found 8 failed MIMO-category cases and
-no skips. The clean FEC CUDA audit found 30 failed FEC-category cases, one
-passed standalone Trellis case, and no skips. The clean NR CUDA audit found 12
-failed NR-category cases and no skips. The latest collected umbrella PHY audit
-across the current 126-case dynamic set failed 125 cases, passed only
-`fec-trellis`, and had no skips. The latest umbrella PHY forward-probe sweep
-found 18 forward exceptions and 30 cases with wrong-device forward outputs,
-covering 33 returned tensors. The upstream-facing repro note is now drafted
-from the audit-only and forward-probe CUDA evidence. Server-side environment
-and inventory evidence has also been captured on the Ubuntu multi-GPU system.
+- `sionna.phy.channel`
+- `sionna.phy.mapping`
+- `sionna.phy.signal`
+- `sionna.phy.mimo`
+- `sionna.phy.ofdm`
+- `sionna.phy.fec`
+- `sionna.phy.nr`
 
-## Phase 3: upstream report material
+Latest collected CUDA evidence:
 
-Prepare the material needed for an upstream issue:
+- Audit-only PHY sweep: 126 total dynamic cases, 125 failed audit cases, one
+  passed case, and zero skipped cases.
+- Only passed audit case: standalone `fec-trellis`.
+- Forward-probe PHY sweep: 18 forward exceptions and 30 cases with wrong-device
+  forward outputs, covering 33 returned tensors.
 
-- Python, PyTorch, Sionna, CUDA, and GPU environment information.
-- Minimal runnable commands.
-- Expected behavior: after `.to("cuda:0")`, both internal object state and
-  forward outputs should live on `cuda:0`.
-- Actual behavior: mismatched audit paths, forward exceptions, or output-device
-  mismatches.
-- Any temporary workaround should be recorded separately instead of being mixed
-  into the repro scripts.
+## Primary commands
+
+Choose any visible CUDA device:
+
+```bash
+CUDA_DEVICE=cuda:0
+```
+
+Minimal AWGN repro:
+
+```bash
+python run_repro.py run --case awgn --device "$CUDA_DEVICE" --build-device cpu --no-fail
+```
+
+User-style wrapper repro:
+
+```bash
+python run_repro.py run --case wrapped-awgn-channel --device "$CUDA_DEVICE" --build-device cpu --no-fail
+```
+
+Full object-state audit:
+
+```bash
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda.json
+```
+
+Full forward-probe sweep:
+
+```bash
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-fail --json-report reports/phy-forward-cuda.json
+```
 
 ## Verification strategy
 
-- Repository tests should not require Sionna or CUDA; they should validate only
-  the device auditor and case registry.
+- Repository tests should not require Sionna or CUDA; they validate the device
+  auditor and case registry.
 - Real Sionna repros should be executed through the CLI in a CUDA-enabled
   environment.
-- Without CUDA, `python run_repro.py env` should still provide environment
-  diagnostics, and `pytest` should still be able to run.
+- Without CUDA, `python run_repro.py env` should still provide diagnostics, and
+  `pytest` should still be able to run.

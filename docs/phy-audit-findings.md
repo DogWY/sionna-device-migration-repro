@@ -8,27 +8,29 @@ standalone MIMO, standalone OFDM, standalone FEC, and standalone NR cases
 currently implemented in this repository.
 
 The important point is that 125 of 126 audited dynamic PHY cases show device
-migration issues after a normal PyTorch `.to(cuda:1)` call when constructed on
-CPU first. The only passing case is the standalone `fec-trellis` case, which is
-a boundary case because it is not itself a Sionna `Block` with stale logical
-device state.
+migration issues after CPU construction followed by a normal PyTorch
+`.to(cuda_device)` call. The only passing case is standalone `fec-trellis`,
+which is a boundary case because it is not itself a Sionna `Block` with stale
+logical device state.
 
 ## Command
 
-The sweep constructed objects on CPU before calling `.to(cuda:1)` and disabled
+The sweep constructed objects on CPU before calling `.to(device)` and disabled
 forward probes so that the report focuses on post-migration object state:
 
 ```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
+CUDA_DEVICE=cuda:0
+python run_repro.py run --category phy --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda.json
 ```
+
+The collected report used `cuda:1`; any visible CUDA device can be used.
 
 ## Sweep summary
 
 Environment:
 
 - Runtime: Ubuntu server with NVIDIA CUDA GPUs.
-- Sionna environment: `sdm`.
-- Target device: `cuda:1`.
+- Target device in collected report: `cuda:1`.
 - Build device: `cpu`.
 - Forward probes: disabled.
 
@@ -52,7 +54,8 @@ The category counts overlap by one case: `apply-ofdm` belongs to both
 The companion forward-probe sweep kept safe minimal forward inputs enabled for
 the same 126-case set. It found 18 forward exceptions and 30 cases that
 completed forward execution but returned 33 tensors on CPU instead of
-`cuda:1`. See [`forward-probe-findings.md`](forward-probe-findings.md).
+the selected CUDA device. See
+[`forward-probe-findings.md`](forward-probe-findings.md).
 
 ## Area summary
 
@@ -77,7 +80,7 @@ device field:
 expected=cuda:1, actual=cpu, kind=logical-device
 ```
 
-This confirms that PyTorch `.to(cuda:1)` does not synchronize Sionna's separate
+This confirms that PyTorch `.to(device)` does not synchronize Sionna's separate
 logical device state such as `_device_str`.
 
 ### Ordinary tensor attributes not migrated
@@ -146,6 +149,5 @@ Focused area reports are available for channel, mapping/signal, MIMO, OFDM,
 FEC, and NR. Runtime-impact evidence is summarized separately in
 [`forward-probe-findings.md`](forward-probe-findings.md).
 
-```bash
-python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
-```
+Use the command above to regenerate the audit report on any visible CUDA
+device.

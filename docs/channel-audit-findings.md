@@ -8,36 +8,26 @@ This document records the current CUDA audit evidence for
 
 The important point is that the issue is not limited to the user-defined
 `AWGNChannel` wrapper. Every currently implemented channel case shows stale
-Sionna logical device state after a normal PyTorch `.to(cuda:1)` call.
+Sionna logical device state after CPU construction followed by a normal PyTorch
+`.to(cuda_device)` call.
 
 ## Commands
 
-The first sweep used Sionna's global default construction behavior:
+The clean sweep constructed every object on CPU before calling `.to(device)`:
 
 ```bash
-python run_repro.py run --category channel --device cuda:1 --no-probe-forward --json-report reports/channel-audit-cuda1.json
+CUDA_DEVICE=cuda:0
+python run_repro.py run --category channel --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/channel-audit-cuda.json
 ```
 
-This captured several valid stale-device findings, but some cases failed during
-construction with CUDA out-of-memory errors because Sionna's default device was
-`cuda:0`.
-
-The clean sweep constructed every object on CPU before calling `.to(cuda:1)`:
-
-```bash
-python run_repro.py run --category channel --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/channel-audit-cuda1-clean.json
-```
-
-This removed the construction-time OOM noise and produced a clean audit result
-for all channel cases.
+The collected report used `cuda:1`; any visible CUDA device can be used.
 
 ## Clean sweep summary
 
 Environment:
 
 - Runtime: Ubuntu server with NVIDIA CUDA GPUs.
-- Sionna environment: `sdm`.
-- Target device: `cuda:1`.
+- Target device in collected report: `cuda:1`.
 - Build device: `cpu`.
 - Forward probes: disabled.
 
@@ -83,8 +73,8 @@ pattern:
 expected=cuda:1, actual=cpu, kind=logical-device
 ```
 
-This indicates that PyTorch `.to(cuda:1)` does not update Sionna's `_device_str`
-field.
+This indicates that PyTorch `.to(device)` does not update Sionna's
+`_device_str` field.
 
 ### Stale child module state
 
@@ -124,33 +114,8 @@ Two separate migration gaps are now documented:
 - Derived tensor attributes that are not registered as buffers are not moved by
   PyTorch `.to()`.
 
-## Next step
+## Related evidence
 
-Dynamic repro coverage has now been extended beyond `sionna.phy.channel` for:
-
-- `sionna.phy.mapping`
-- `sionna.phy.signal`
-
-The mapping and signal CUDA reports have also been collected. See
-[`mapping-signal-audit-findings.md`](mapping-signal-audit-findings.md).
-
-The umbrella PHY report has now also been collected. See
-[`phy-audit-findings.md`](phy-audit-findings.md).
-
-Standalone `sionna.phy.ofdm` dynamic cases have now been added and audited. The
-clean OFDM sweep found 33/33 OFDM-category cases failed and 0 skipped. The
-updated umbrella PHY sweep also found 75/75 current cases failed and 0 skipped.
-Standalone `sionna.phy.mimo` cases have now been added and audited. The MIMO
-sweep found 8/8 failed cases and 0 skipped. The updated umbrella PHY sweep
-after the MIMO expansion found 83/83 then-current cases failed and 0 skipped.
-See
-[`mimo-audit-findings.md`](mimo-audit-findings.md) and
-[`phy-audit-findings.md`](phy-audit-findings.md). Standalone
-`sionna.phy.fec` cases have now been added and audited. The FEC sweep found
-30/31 failed cases, one passed standalone Trellis case, and 0 skipped. See
-[`fec-audit-findings.md`](fec-audit-findings.md). The updated umbrella PHY
-sweep across all 114 then-current dynamic cases found 113 failed cases, one passed
-standalone Trellis case, and 0 skipped. Standalone NR dynamic cases have now
-been added and audited: 12/12 failed and 0 skipped. The updated umbrella PHY
-sweep across all 126 current dynamic cases found 125 failed cases, one passed
-standalone Trellis case, and 0 skipped.
+The umbrella PHY audit and forward-probe summaries are in
+[`phy-audit-findings.md`](phy-audit-findings.md) and
+[`forward-probe-findings.md`](forward-probe-findings.md).

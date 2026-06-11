@@ -6,28 +6,23 @@ This document records CUDA audit evidence for the `sionna.phy.ofdm` dynamic
 case set. The clean OFDM sweep shows the same device-migration pattern already
 seen in channel, mapping, and signal objects.
 
-An earlier OFDM sweep exposed a repro-harness issue: two channel-estimator cases
-were skipped during construction because Sionna's default channel interpolator
-uses the global `sionna.phy.config.device`, bypassing the case-level
-`build_device`. The runner now temporarily aligns Sionna's global construction
-device with `--build-device`, and the estimator cases avoid the default
-interpolator so that `--build-device cpu` remains clean.
-
 ## Command
 
 The clean sweep used:
 
 ```bash
-python run_repro.py run --category ofdm --device cuda:1 --build-device cpu --no-probe-forward --json-report reports/ofdm-audit-cuda1.json
+CUDA_DEVICE=cuda:0
+python run_repro.py run --category ofdm --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/ofdm-audit-cuda.json
 ```
+
+The collected report used `cuda:1`; any visible CUDA device can be used.
 
 ## Clean sweep summary
 
 Environment:
 
 - Runtime: Ubuntu server with NVIDIA CUDA GPUs.
-- Sionna environment: `sdm`.
-- Target device: `cuda:1`.
+- Target device in collected report: `cuda:1`.
 - Build device: `cpu`.
 - Forward probes: disabled.
 
@@ -38,7 +33,7 @@ Result:
 - Skipped cases: 0.
 - All OFDM-category cases include stale Sionna logical device state.
 - Many OFDM cases also include ordinary tensor attributes that remain on CPU
-  after `.to(cuda:1)`.
+  after `.to(device)`.
 
 ## Case-level findings
 
@@ -114,46 +109,21 @@ audit shows stale state across these child objects, confirming that PyTorch
 module recursion does not fix Sionna-specific logical device fields or ordinary
 tensor attributes.
 
-## Harness fix confirmed
-
-The clean sweep confirms that the construction-device fix worked:
-
-- `base-channel-estimator` and `ls-channel-estimator` no longer skip during
-  construction.
-- `StreamManagement._device_str` is now constructed on `cpu` under
-  `--build-device cpu`, rather than leaking Sionna's previous global default
-  such as `cuda:0`.
-
-These fields still fail the audit after `.to(cuda:1)`, which is the intended
-device-migration evidence.
-
 ## Interpretation
 
 The clean OFDM sweep is strong evidence that `.to(device)` migration issues are
 systematic across standalone `sionna.phy.ofdm` objects, not only across channel,
 mapping, and signal objects.
 
-Combined audit-only CUDA evidence so far:
+Combined audit-only CUDA evidence:
 
-- `sionna.phy.channel`: 17/17 current cases failed audit.
-- `sionna.phy.mapping`: 14/14 current cases failed audit.
-- `sionna.phy.signal`: 12/12 current cases failed audit.
+- `sionna.phy.channel`: 17/17 cases failed audit.
+- `sionna.phy.mapping`: 14/14 cases failed audit.
+- `sionna.phy.signal`: 12/12 cases failed audit.
 - `sionna.phy.ofdm`: 33/33 OFDM-category cases failed audit.
 
-## Next step
+## Related evidence
 
-The updated umbrella PHY sweep after the OFDM expansion also found 75/75
-current cases failed and 0 skipped. Standalone `sionna.phy.mimo` cases have
-now been added and audited. The MIMO sweep found 8/8 failed cases and 0
-skipped. The updated umbrella PHY sweep after the MIMO expansion found 83/83
-then-current cases failed and 0 skipped. See
-[`mimo-audit-findings.md`](mimo-audit-findings.md) and
-[`phy-audit-findings.md`](phy-audit-findings.md). Standalone
-`sionna.phy.fec` cases have now been added and audited. The FEC sweep found
-30/31 failed cases, one passed standalone Trellis case, and 0 skipped. See
-[`fec-audit-findings.md`](fec-audit-findings.md). The updated umbrella PHY
-sweep across all 114 then-current dynamic cases found 113 failed cases, one passed
-standalone Trellis case, and 0 skipped. Standalone NR dynamic cases have now
-been added and audited: 12/12 failed and 0 skipped. The updated umbrella PHY
-sweep across all 126 current dynamic cases found 125 failed cases, one passed
-standalone Trellis case, and 0 skipped.
+The umbrella PHY audit and forward-probe summaries are in
+[`phy-audit-findings.md`](phy-audit-findings.md) and
+[`forward-probe-findings.md`](forward-probe-findings.md).

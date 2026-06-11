@@ -6,26 +6,27 @@ This document records CUDA audit evidence for the standalone `sionna.phy.nr`
 dynamic cases. These cases cover all 12 P0 `sionna.phy.nr` classes identified
 by the local inventory.
 
-All NR cases are audit-only for now. The goal is to isolate post-`.to(device)`
-object state before adding forward probes for complex PUSCH and transport-block
-workflows.
+The goal is to isolate post-`.to(device)` object state for NR blocks, including
+composite PUSCH and transport-block workflows.
 
 ## Command
 
-The sweep constructed objects on CPU before calling `.to(cuda:1)` and disabled
+The sweep constructed objects on CPU before calling `.to(device)` and disabled
 forward probes:
 
 ```bash
-python run_repro.py run --category nr --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/nr-audit-cuda1.json
+CUDA_DEVICE=cuda:0
+python run_repro.py run --category nr --device "$CUDA_DEVICE" --build-device cpu --no-probe-forward --no-fail --json-report reports/nr-audit-cuda.json
 ```
+
+The collected report used `cuda:1`; any visible CUDA device can be used.
 
 ## Sweep summary
 
 Environment:
 
 - Runtime: Ubuntu server with NVIDIA CUDA GPUs.
-- Sionna environment: `sdm`.
-- Target device: `cuda:1`.
+- Target device in collected report: `cuda:1`.
 - Build device: `cpu`.
 - Forward probes: disabled.
 
@@ -57,8 +58,8 @@ Result:
 
 ### Stale logical device state
 
-All standalone NR cases include stale Sionna logical device state after a
-normal PyTorch `.to(cuda:1)` call:
+All standalone NR cases include stale Sionna logical device state after CPU
+construction followed by a normal PyTorch `.to(device)` call:
 
 ```text
 expected=cuda:1, actual=cpu, kind=logical-device
@@ -70,7 +71,7 @@ objects, such as `PUSCHTransmitter` and `PUSCHReceiver`.
 ### Ordinary tensor attributes not migrated
 
 Several NR objects keep non-buffer tensor attributes that stay on CPU after
-`.to(cuda:1)`. Representative examples include:
+`.to(device)`. Representative examples include:
 
 - `TBDecoder._decoder._cn_gather_idx`
 - `TBDecoder._decoder._vn_mask`
