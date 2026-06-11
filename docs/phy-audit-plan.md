@@ -242,7 +242,7 @@ Produce artifacts that can be shared with maintainers or collaborators:
 - [x] Run forward PHY sweep for safe cases.
 - [x] Summarize affected classes and failure modes for the current dynamic case
   set.
-- [ ] Prepare a short upstream-facing repro note.
+- [x] Prepare a short upstream-facing repro note.
 
 ## Current repository status
 
@@ -291,6 +291,7 @@ Implemented already:
   after standalone NR cases were added.
 - CUDA forward-probe evidence for the current 126-case umbrella `phy` dynamic
   case set.
+- issue-ready upstream repro note.
 
 Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
@@ -303,12 +304,14 @@ Local inventory smoke result with Sionna 2.0.1 in the `sdm` environment:
 
 Not implemented yet:
 
-- upstream-facing repro note.
+- server-side `reports/phy-inventory.json`, if a machine-local inventory
+  artifact is needed for attachment.
+- upstream issue posting.
 
 ## Recommended next step
 
-Prepare a short upstream-facing repro note from the current 126-case CUDA
-evidence. The latest forward-probe report can be regenerated with:
+Post the upstream-facing repro note or attach it to a maintainer discussion.
+The latest forward-probe report can be regenerated with:
 
 ```bash
 python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-fail --json-report reports/phy-forward-cuda1.json

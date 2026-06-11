@@ -33,7 +33,8 @@ https://github.com/NVlabs/sionna
 |   +-- ofdm-audit-findings.md
 |   +-- phy-audit-findings.md
 |   +-- phy-audit-plan.md
-|   `-- project-plan.md
+|   +-- project-plan.md
+|   `-- upstream-repro-note.md
 +-- examples/
 |   +-- minimal_awgn_to_cuda.py
 |   `-- wrapped_awgn_channel_to_cuda.py
@@ -102,6 +103,8 @@ Current OFDM CUDA findings are tracked in
 Runtime-impact evidence from the current umbrella forward-probe sweep is
 summarized in
 [docs/forward-probe-findings.md](docs/forward-probe-findings.md).
+An issue-ready upstream note is available at
+[docs/upstream-repro-note.md](docs/upstream-repro-note.md).
 
 ## Quick start
 
@@ -316,8 +319,8 @@ expected:
 python run_repro.py run --category phy --device cuda:1 --build-device cpu --no-probe-forward --no-fail --json-report reports/phy-audit-cuda1.json
 ```
 
-The next project step is to prepare an upstream-facing repro note from the
-audit-only and forward-probe CUDA evidence.
+The upstream-facing repro note has been drafted from the audit-only and
+forward-probe CUDA evidence.
 
 If multiple audit commands are chained in one shell command, pass `--no-fail`
 to earlier commands. Failed audit cases are expected and otherwise stop `&&`

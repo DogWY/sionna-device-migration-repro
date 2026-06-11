@@ -52,8 +52,8 @@ failed NR-category cases and no skips. The latest collected umbrella PHY audit
 across the current 126-case dynamic set failed 125 cases, passed only
 `fec-trellis`, and had no skips. The latest umbrella PHY forward-probe sweep
 found 18 forward exceptions and 30 cases with wrong-device forward outputs,
-covering 33 returned tensors. The next project target is an upstream-facing
-repro note from the audit-only and forward-probe CUDA evidence.
+covering 33 returned tensors. The upstream-facing repro note is now drafted
+from the audit-only and forward-probe CUDA evidence.
 
 ## Phase 3: upstream report material
 
